@@ -1,10 +1,12 @@
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit, QCompleter, \
-    QSpacerItem, QSizePolicy, QPushButton
+from PyQt6.QtWidgets import (
+    QWidget, QHBoxLayout, QLabel, QLineEdit, QCompleter, QSpacerItem, QSizePolicy,
+    QPushButton
+)
 
-from table_modifier.gui.emitter import signal_emitter
+from table_modifier.signals import EMIT
 
 
 class FolderSelectorWidget(QWidget):
@@ -65,7 +67,7 @@ class FolderSelectorWidget(QWidget):
         """
         folder = self.folder_input.text().strip()
         if folder and Path(folder).is_dir():
-            signal_emitter.folderUpdated.emit(folder)
+            EMIT("directory.updated", directory=folder)
 
     def on_open_button_clicked(self):
         """

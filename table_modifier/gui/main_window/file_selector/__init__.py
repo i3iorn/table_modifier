@@ -1,14 +1,11 @@
-import glob
 import logging
-from pathlib import Path
 
 from PyQt6.QtCore import Qt, QModelIndex
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListView, QHBoxLayout
 
 from table_modifier.config.state import state
-from table_modifier.file_interface.factory import FileInterfaceFactory
-from table_modifier.gui.emitter import signal_emitter
 from table_modifier.gui.main_window.file_selector.models import FileModel
+from table_modifier.signals import ON
 
 
 class FileSelectorWidget(QWidget):
@@ -43,7 +40,7 @@ class FileSelectorWidget(QWidget):
         box_layout = QHBoxLayout(self)
 
         self.file_model = FileModel(self)
-        signal_emitter.folderUpdated.connect(self.file_model.update_files_from_folder_path)
+        ON("directory.updated", self.file_model.update_files_from_folder_path)
 
         self.file_view = QListView(self)
         self.file_view.setModel(self.file_model)
@@ -58,7 +55,7 @@ class FileSelectorWidget(QWidget):
         self.selected_files_view.setSelectionMode(
             QListView.SelectionMode.SingleSelection
         )
-        signal_emitter.tracked_files.updated.connect(self.selected_files_model.update)
+        ON("state.file.tracked_files.*", self.selected_files_model.update)
 
         box_layout.addWidget(self.file_view, 2)
         box_layout.addWidget(self.selected_files_view, 1)

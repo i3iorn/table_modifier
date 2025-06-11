@@ -1,4 +1,3 @@
-import glob
 import logging
 from pathlib import Path
 from typing import List, Optional
@@ -6,7 +5,7 @@ from typing import List, Optional
 from PyQt6.QtCore import QAbstractListModel, Qt
 
 from table_modifier.config.state import state
-from table_modifier.gui.emitter import signal_emitter
+from table_modifier.file_interface.factory import FileInterfaceFactory
 
 
 class FileModel(QAbstractListModel):
@@ -38,7 +37,7 @@ class FileModel(QAbstractListModel):
             return self.files[index.row()]
         return None
 
-    def update(self):
+    def update(self, sender, **kwargs):
         """
         Update the model with the current list of files.
 
@@ -54,17 +53,24 @@ class FileModel(QAbstractListModel):
         self.endResetModel()
         self.logger.info(f"File model updated with {len(self.files)} files")
 
-    def update_files_from_folder_path(self, folder_path: str):
+    def update_files_from_folder_path(self, sender, **kwargs):
         """
         Update the model with files from the specified folder path.
 
-        :param folder_path: The path to the folder from which to load files.
+        :param directory: The path to the folder from which to load files.
         """
-        self.logger.debug(f"Updating files from folder: {folder_path}")
+        directory = kwargs.get("directory")
+        self.logger.debug(f"Updating files from folder: {directory}")
         self.beginResetModel()
-        self.files = [file for file in Path(folder_path).glob("*") if file.is_file()]
+        self.files = [
+            file
+            for file
+            in Path(directory).glob("*")
+            if file.is_file()
+               and FileInterfaceFactory.can_handle(file.as_posix())
+        ]
         self.endResetModel()
-        self.logger.info(f"Loaded {len(self.files)} files from {folder_path}")
+        self.logger.info(f"Loaded {len(self.files)} files from {directory}")
 
     def rowCount(self, parent=None):
         """

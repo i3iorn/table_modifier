@@ -8,8 +8,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from table_modifier.file_interface.factory import FileInterfaceFactory
 from table_modifier.file_interface.protocol import FileInterfaceProtocol
 from table_modifier.file_status import FileStatus
-from table_modifier.gui.emitter import signal_emitter
-
+from table_modifier.signals import EMIT
 
 FilePath = str | Path | FileInterfaceProtocol
 
@@ -33,17 +32,6 @@ def from_file_path(file_path: FilePath) -> FileInterfaceProtocol:
             f"Expected str, Path, or FileInterfaceProtocol, got {type(file_path).__name__}")
 
 
-class FileListSignals(QObject):
-    """
-    Signals for the FileList class to notify about file additions and removals.
-    """
-    fileAdded = pyqtSignal(FileInterfaceProtocol)
-    fileRemoved = pyqtSignal(FileInterfaceProtocol)
-    fileStatusUpdated = pyqtSignal(FileInterfaceProtocol, FileStatus)
-    updated = pyqtSignal()
-    listCleared = pyqtSignal()
-
-
 class FileList:
     """
     A dictionary-like class that holds file paths as keys and their statuses as values.
@@ -51,12 +39,12 @@ class FileList:
 
     It integrates with the application's signal emitter to notify when files are added or removed.
     """
-    def __init__(self):
+    def __init__(self, name: str):
         super().__init__()
+        self._name = name
         self._lock: Lock = Lock()
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._files: Dict[FileInterfaceProtocol, FileStatus] = {}
-        self.signals = FileListSignals()
 
     def append(self, file_path: FilePath, status: FileStatus = FileStatus()) -> None:
         """
@@ -71,13 +59,12 @@ class FileList:
             if file_interface in self._files:
                 self._logger.debug(f"Updating existing file {file_interface} status to {status}")
                 self._files[file_interface] = status
-                self.signals.fileStatusUpdated.emit(file_interface, status)
+                EMIT(f"state.file.{self._name}.updated", file=file_interface, status=status)
             else:
                 self._logger.debug(f"Adding new file {file_interface} with status {status}")
                 self._files[file_interface] = status
-                self.signals.fileAdded.emit(file_interface)
+                EMIT(f"state.file.{self._name}.added", file=file_interface, status=status)
             self._files[file_interface] = status
-        self.signals.updated.emit()
 
     def __setitem__(self, file_path: FilePath, status: FileStatus) -> None:
         """
@@ -117,8 +104,7 @@ class FileList:
             if file_interface not in self._files:
                 raise KeyError(f"File {file_interface} not found in FileList")
             del self._files[file_interface]
-        self.signals.fileRemoved.emit(file_interface)
-        self.signals.updated.emit()
+            EMIT(f"state.file.{self._name}.deleted", file=file_interface)
 
     def clear(self) -> None:
         """
@@ -126,7 +112,7 @@ class FileList:
         """
         with self._lock:
             self._files.clear()
-        self.signals.listCleared.emit()
+            EMIT(f"file.{self._name}.cleared")
         self._logger.debug("FileList cleared")
 
     def __contains__(self, file_path: FilePath) -> bool:
@@ -169,11 +155,8 @@ class State:
     _controls_lock: Lock = Lock()
 
     def __init__(self):
-        self.tracked_files: FileList = FileList()
-        signal_emitter.tracked_files = self.tracked_files.signals
-
+        self.tracked_files: FileList = FileList("tracked_files")
         self._controls: Dict[str, any] = {}
-
         self._logger = logging.getLogger("table_modifier.state")
 
     @property
@@ -202,7 +185,7 @@ class State:
         """
         with self._controls_lock:
             self._controls[name_id] = new_value
-            signal_emitter.controlUpdated.emit(name_id, new_value)
+            EMIT(f"control.{name_id}.updated", control=name_id, new_value=new_value)
         self._logger.debug(f"Control '{name_id}' updated to: {new_value}")
 
 
