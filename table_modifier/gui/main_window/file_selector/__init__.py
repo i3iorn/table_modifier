@@ -59,6 +59,7 @@ class FileSelectorWidget(QWidget):
 
         box_layout.addWidget(self.file_view, 2)
         box_layout.addWidget(self.selected_files_view, 1)
+        state.container.selected_files_model = self.selected_files_model
         self.layout().addLayout(box_layout)
 
     def connect_signals(self) -> None:
@@ -66,6 +67,7 @@ class FileSelectorWidget(QWidget):
         Connect signals to handle user interactions with the file selector widget.
         """
         self.file_view.doubleClicked.connect(self.on_file_double_clicked)
+        self.selected_files_view.doubleClicked.connect(self.on_selected_files_double_clicked)
 
     def on_file_double_clicked(self, index: QModelIndex) -> None:
         """
@@ -81,6 +83,28 @@ class FileSelectorWidget(QWidget):
         if not file_path:
             return
 
-        self.logger.info(f"File selected: {file_path}")
+        self.logger.debug(f"File selected: {file_path}")
         if file_path not in self.state.tracked_files:
             state.tracked_files.append(file_path)
+        else:
+            self.logger.info(f"File {file_path} is already selected.")
+
+    def on_selected_files_double_clicked(self, index: QModelIndex) -> None:
+        """
+        Handle the double-click event on a selected file in the list view.
+
+        This method retrieves the file path from the clicked index and emits a signal
+        to remove the file from the selected files in the application state.
+        """
+        if not index.isValid():
+            return
+
+        file_path = self.selected_files_model.data(index, role=Qt.ItemDataRole.UserRole)
+        if not file_path:
+            return
+
+        self.logger.debug(f"Removing selected file: {file_path}")
+        if file_path in self.state.tracked_files:
+            del self.state.tracked_files[file_path]
+        else:
+            self.logger.warning(f"File {file_path} is not in the tracked files.")

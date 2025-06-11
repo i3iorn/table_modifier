@@ -2,21 +2,34 @@ import os
 from typing import Iterator, Dict, Any, Optional
 import pandas as pd
 
-from table_modifier.file_interface.factory import FileInterfaceFactory
-from table_modifier.file_interface.protocol import FileInterfaceProtocol
+from .utils import FilePath
+from .factory import FileInterfaceFactory
+from .protocol import FileInterfaceProtocol
 
 
 class ExcelFileInterface(FileInterfaceProtocol):
     file_type = "excel"
 
-    def __init__(self, file_path: Optional[str] = None, sheet_name: Optional[str] = None):
+    def __init__(self, file_path: Optional[FilePath] = None, sheet_name: Optional[str] = None):
         """
         :param file_path: path to the .xls/.xlsx file
         :param sheet_name: name or index of sheet to operate on; defaults to first sheet
         """
-        self.file_path = file_path
+        self.path = file_path
         self.sheet_name = sheet_name
         self._df: Optional[pd.DataFrame] = None
+
+    def get_headers(self, sheet_name: str = None) -> Optional[list[str]]:
+        """
+        Returns the header row of the specified sheet if it exists.
+        If no header is present, returns None.
+        """
+        self._ensure_sheet()
+        if sheet_name is None:
+            sheet_name = self.sheet_name or pd.ExcelFile(self.path).sheet_names[0]
+        skip_rows = self._skip_rows if hasattr(self, '_skip_rows') else 0
+        df = pd.read_excel(self.path, sheet_name=sheet_name, nrows=0, skiprows=skip_rows)
+        return list(df.columns)
 
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
@@ -26,7 +39,7 @@ class ExcelFileInterface(FileInterfaceProtocol):
     def _ensure_sheet(self) -> None:
         # Lazily load ExcelFile to pick a default sheet
         if self.sheet_name is None:
-            xls = pd.ExcelFile(self.file_path)
+            xls = pd.ExcelFile(self.path)
             self.sheet_name = xls.sheet_names[0]
 
     def append_df(self, df: pd.DataFrame) -> None:
@@ -53,7 +66,7 @@ class ExcelFileInterface(FileInterfaceProtocol):
     def load(self) -> pd.DataFrame:
         # Eager read entire sheet
         self._ensure_sheet()
-        self._df = pd.read_excel(self.file_path, sheet_name=self.sheet_name)
+        self._df = pd.read_excel(self.path, sheet_name=self.sheet_name)
         return self._df
 
     def iter_load(self, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
@@ -67,13 +80,13 @@ class ExcelFileInterface(FileInterfaceProtocol):
             yield chunk.iloc[0].to_dict()
 
     def save(self) -> None:
-        self.save_as(self.file_path)
+        self.save_as(self.path.as_posix())
 
     def save_as(self, file_path: str) -> None:
         if self._df is None:
             raise RuntimeError("No DataFrame loaded to save")
         # Use ExcelWriter to preserve sheet_name
-        if self.file_path is None:
+        if self.path is None:
             raise ValueError("File path must be set before saving")
         else:
             with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
@@ -84,14 +97,15 @@ class ExcelFileInterface(FileInterfaceProtocol):
         # Peek at first row if not already loaded
         if self._df is None:
             self._ensure_sheet()
-            df = pd.read_excel(self.file_path, sheet_name=self.sheet_name, nrows=1)
+            skip_rows = self._skip_rows if hasattr(self, '_skip_rows') else 0
+            df = pd.read_excel(self.path, sheet_name=self.sheet_name, skiprows=skip_rows, nrows=1)
         else:
             df = self._df
-        return {col: str(dtype) for col, dtype in df.dtypes.items()}
+        return {str(col): str(dtype) for col, dtype in df.dtypes.items()}
 
     def load_metadata(self) -> Dict[str, Any]:
         # Must inspect sheet names & engine
-        xls = pd.ExcelFile(self.file_path)
+        xls = pd.ExcelFile(self.path)
         return {
             "sheet_names": xls.sheet_names,
             "engine": xls.engine,
@@ -103,6 +117,14 @@ class ExcelFileInterface(FileInterfaceProtocol):
         dupes = {c for c in cols if cols.count(c) > 1}
         if dupes:
             raise ValueError(f"Duplicate column names in sheet: {dupes}")
+
+    def get_sheets(self) -> list[str]:
+        """
+        Return a list of sheet names in the Excel file.
+        """
+        self._ensure_sheet()
+        xls = pd.ExcelFile(self.path)
+        return xls.sheet_names
 
 
 FileInterfaceFactory.register(ExcelFileInterface)

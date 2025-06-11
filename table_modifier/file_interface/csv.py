@@ -11,10 +11,22 @@ from .protocol import FileInterfaceProtocol
 class CSVFileInterface(FileInterfaceProtocol):
     file_type = "csv"
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, **kwargs):
         self.path = Path(file_path)
         self._df: Optional[pd.DataFrame] = None
         self._file = None
+        self._delimiter = kwargs.get("delimiter", ",")
+
+    def get_headers(self, sheet_name: str = None) -> Optional[list[str]]:
+        """
+        Returns the header row of the CSV file if it exists.
+        If no header is present, returns None.
+        """
+        with open(self.path, mode="r", newline="") as f:
+            for line in f:
+                if line.strip():
+                    return line.strip().split(self._delimiter)
+        return None
 
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
@@ -50,10 +62,11 @@ class CSVFileInterface(FileInterfaceProtocol):
     def get_schema(self) -> Dict[str, str]:
         if self._df is None:
             # peek at first row
-            df = pd.read_csv(self.path, nrows=1)
+            skip_rows = self._skip_rows if hasattr(self, '_skip_rows') else 0
+            df = pd.read_csv(self.path, skiprows=skip_rows, nrows=1)
         else:
             df = self._df
-        return {col: str(dtype) for col, dtype in df.dtypes.items()}
+        return {str(col): str(dtype) for col, dtype in df.dtypes.items()}
 
     def load_metadata(self) -> Dict[str, any]:
         # CSV has no extra metadata beyond headers

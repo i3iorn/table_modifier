@@ -6,6 +6,7 @@ from PyQt6.QtCore import QAbstractListModel, Qt
 
 from table_modifier.config.state import state
 from table_modifier.file_interface.factory import FileInterfaceFactory
+from table_modifier.file_interface.protocol import FileInterfaceProtocol
 
 
 class FileModel(QAbstractListModel):
@@ -19,7 +20,7 @@ class FileModel(QAbstractListModel):
         super().__init__(parent)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.state_name = state_name
-        self.files = []
+        self.files: List[Path] = []
 
     def data(self, index, role: int = Qt.ItemDataRole.DisplayRole):
         """
@@ -44,12 +45,9 @@ class FileModel(QAbstractListModel):
         This method is called to refresh the model's data.
         It emits dataChanged signal to notify views about the update.
         """
-        if self.state_name is None:
-            self.logger.warning("State name is not set, cannot update file model without arguments.")
-            return
-        self.logger.debug("Updating file model")
+        self.logger.debug("Updating file model with current files")
         self.beginResetModel()
-        self.files = list(getattr(state, self.state_name, []))
+        self.files = [f.path for f in state.tracked_files.all()]
         self.endResetModel()
         self.logger.info(f"File model updated with {len(self.files)} files")
 

@@ -26,7 +26,7 @@ class EventBus:
                 self._signals[name] = Signal(name)
             return self._signals[name]
 
-    def emit(self, name: str, sender: Optional[Any] = None, debounce: bool = True, **kwargs) -> None:
+    def emit(self, name: str, sender: Optional[Any] = None, **kwargs) -> None:
         """
         Emit a namespaced signal, triggering all exact and wildcard matches.
 
@@ -35,15 +35,6 @@ class EventBus:
             sender (Any, optional): Sender object (defaults to inferred).
             **kwargs: Extra payload.
         """
-        # Debounce logic: skip if called too soon
-        current_time = time.thread_time()
-        if debounce:
-            last_time = self._last_emit_time.get(name, 0)
-            if last_time and (current_time - last_time < DEFAULT_DEBOUNCE_MS / 1000):
-                return
-
-        self._last_emit_time[name] = current_time
-
         # Infer sender if not provided
         sender = sender or self._infer_sender()
 
@@ -55,17 +46,17 @@ class EventBus:
             wildcard_handlers = []
             for pattern, handlers in self._wildcard_map.items():
                 if self._match(name, pattern):
-                    wildcard_handlers.extend(handlers)
+                    wildcard_handlers.extend(handlers.copy())
 
         # Dispatch exact handlers
         if exact_signal:
             self._logger.debug(f"[EventBus] Emitting signal '{name}' with sender '{sender}' and kwargs: {kwargs}")
-            exact_signal.send(sender, **kwargs)
+            exact_signal.send(sender, signal=name, **kwargs)
 
         # Dispatch wildcard handlers
         for handler in wildcard_handlers:
             try:
-                handler(sender, **kwargs)
+                handler(sender, signal=name, **kwargs)
             except Exception as e:
                 self._logger.error(f"Error in wildcard handler for '{name}': {e}", exc_info=True)
 
@@ -78,10 +69,13 @@ class EventBus:
             handler (Callable): The handler to invoke.
         """
         with self._lock:
-            if "*" in name:
+            if name.endswith("*"):
                 self._wildcard_map[name].append(handler)
+            elif "*" in name:
+                raise ValueError("Wildcards must end with '*' (e.g., 'x.y.*'). Use 'x.y.*' for wildcard subscriptions.")
             else:
                 self._get_signal(name).connect(handler)
+                self._logger.debug(f"[EventBus] Subscribed handler to signal '{name}'")
 
     def off(self, name: str, handler: Callable) -> None:
         """
@@ -118,7 +112,7 @@ class EventBus:
         if frame is None:
             return "unknown"
 
-        caller_frame = frame.f_back.f_back  # Skip emit() and EMIT()
+        caller_frame = frame.f_back.f_back.f_back  # Skip emit() and EMIT()
         if caller_frame is None:
             return "unknown"
 

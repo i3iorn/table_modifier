@@ -1,77 +1,43 @@
-from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QSpacerItem, QSizePolicy, QWidget
+from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QTabWidget
 
-from table_modifier.config.state import state, State
-from table_modifier.gui.main_window.controls import ControlsWidget
+from table_modifier.config.state import state
+from table_modifier.gui.main_window.config_screen import ConfigScreen
 from table_modifier.gui.main_window.file_selector import FileSelectorWidget
 from table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
-from table_modifier.gui.main_window.log_viewer import LogViewerWidget
+from table_modifier.gui.main_window.input_screen import InputScreen
+from table_modifier.gui.main_window.map_screen import MapScreen
+from table_modifier.signals import ON
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, parent=None, saved_state: State = None):
+    def __init__(self, parent=None):
         super().__init__(parent)
+        ON("status.update", self.update_status_bar)
         self.setWindowTitle("Table Modifier")
         self.setGeometry(100, 100, 800, 600)
-        self.state = saved_state or state
         self.main_layout = QVBoxLayout()
         self.init_ui()
 
     def init_ui(self):
-        cw = QWidget(self)
+        # Create a central widget with tabs
+        cw = QTabWidget(self)
         cw.setLayout(self.main_layout)
         self.setCentralWidget(cw)
 
-        self.init_folder_selector()
-        self.init_file_selector()
-        self.init_controls()
-        self.init_log_viewer()
-        self.init_status_bar()
+        cw.addTab(InputScreen(self), "Input Screen")
+        cw.addTab(ConfigScreen(self), "Configuration")
+        cw.addTab(MapScreen(self), "Map Columns")
+
         self.init_menu_bar()
-
-        self.layout().addItem(QSpacerItem(
-            0, 0, QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum
-        ))
-
-    def init_folder_selector(self):
-        self.folder_selector = FolderSelectorWidget(self.centralWidget())
-        self.main_layout.addWidget(self.folder_selector)
-
-    def init_file_selector(self):
-        self.file_selector = FileSelectorWidget(self.centralWidget())
-        self.main_layout.addWidget(self.file_selector)
-
-    def init_controls(self):
-        self.controls = ControlsWidget(self.centralWidget())
-        self.main_layout.addWidget(self.controls)
-
-    def init_log_viewer(self):
-        self.log_viewer = LogViewerWidget(self.centralWidget())
-        self.main_layout.addWidget(self.log_viewer)
-
-    def init_status_bar(self):
-        self.statusBar().showMessage("Ready")
-        self.status_bar = self.statusBar()
 
     def init_menu_bar(self):
         self.menuBar().setNativeMenuBar(False)
         self.menu_bar = self.menuBar()
-        """
-        # Add file menu
-        file_menu = self.menuBar().addMenu("File")
-        open_action = file_menu.addAction("Open")
-        open_action.triggered.connect(self.injection_container.file_selector.open_file_dialog)
 
-        save_action = file_menu.addAction("Save")
-        save_action.triggered.connect(self.injection_container.file_selector.save_file_dialog)
-
-        exit_action = file_menu.addAction("Exit")
-        exit_action.triggered.connect(self.close)
-
-        # Add help menu
-        help_menu = self.menuBar().addMenu("Help")
-        about_action = help_menu.addAction("About")
-        about_action.triggered.connect(self.show_about_dialog)
-        """
+    def update_status_bar(self, sender, msg, timeout=8000, **kwargs):
+        sender_class = sender.split(":")[-1].split(".")[0]
+        msg = f"{sender_class}: {msg}"
+        self.statusBar().showMessage(msg,timeout)
 
     def show_about_dialog(self):
         from PyQt6.QtWidgets import QMessageBox
@@ -81,5 +47,5 @@ class MainWindow(QMainWindow):
         """
         Handle the close event to clean up resources.
         """
-        self.state.maybe_store()
+        state.maybe_store()
         super().closeEvent(event)

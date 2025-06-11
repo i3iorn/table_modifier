@@ -22,6 +22,15 @@ class FileInterfaceProtocol(Protocol):
     def name(self):
         return self.path.name
 
+    def get_headers(self, sheet_name: str = None) -> Optional[list[str]]:
+        """
+        Return the header row of the file if it exists.
+        If no header is present, return None.
+
+        For Excel files, sheet_name can be specified to get headers from a specific sheet.
+        """
+        ...
+
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
         """Return True if this handler supports the given file_path (usually via extension)."""
@@ -64,6 +73,13 @@ class FileInterfaceProtocol(Protocol):
         Stream single rows as a dict mapping column→value.
         Useful for record‐by‐record processing.
         """
+
+    def set_header_rows_to_skip(self, header_rows: int) -> None:
+        """
+        Set the number of header rows to skip when loading data.
+        This is useful for formats like CSV where the header may not be on the first row.
+        """
+        self._skip_rows = header_rows
 
     def save(self) -> None:
         """Write current DataFrame back to self.file_path."""

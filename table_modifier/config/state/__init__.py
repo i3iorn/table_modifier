@@ -1,35 +1,11 @@
 import logging
-from pathlib import Path
 from threading import Lock
-from typing import Dict, Any
+from typing import Dict, Any, List
 
-from PyQt6.QtCore import QObject, pyqtSignal
-
-from table_modifier.file_interface.factory import FileInterfaceFactory
 from table_modifier.file_interface.protocol import FileInterfaceProtocol
+from table_modifier.file_interface.utils import from_file_path, FilePath
 from table_modifier.file_status import FileStatus
 from table_modifier.signals import EMIT
-
-FilePath = str | Path | FileInterfaceProtocol
-
-
-def from_file_path(file_path: FilePath) -> FileInterfaceProtocol:
-    """
-    Convert a file path to a FileInterfaceProtocol instance.
-
-    Args:
-        file_path (FilePath): The file path to convert.
-
-    Returns:
-        FileInterfaceProtocol: The file interface instance.
-    """
-    if isinstance(file_path, FileInterfaceProtocol):
-        return file_path
-    elif isinstance(file_path, str) or isinstance(file_path, Path):
-        return FileInterfaceFactory.create(file_path)
-    else:
-        raise TypeError(
-            f"Expected str, Path, or FileInterfaceProtocol, got {type(file_path).__name__}")
 
 
 class FileList:
@@ -46,6 +22,16 @@ class FileList:
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._files: Dict[FileInterfaceProtocol, FileStatus] = {}
 
+    def all(self) -> List[FileInterfaceProtocol]:
+        """
+        Get all file paths in the list.
+
+        Returns:
+            List[FileInterfaceProtocol]: A list of all file paths.
+        """
+        with self._lock:
+            return list(self._files.keys())
+
     def append(self, file_path: FilePath, status: FileStatus = FileStatus()) -> None:
         """
         Append a file to the list with its status.
@@ -57,14 +43,13 @@ class FileList:
         file_interface = from_file_path(file_path)
         with self._lock:
             if file_interface in self._files:
-                self._logger.debug(f"Updating existing file {file_interface} status to {status}")
-                self._files[file_interface] = status
-                EMIT(f"state.file.{self._name}.updated", file=file_interface, status=status)
+                action = "updated"
             else:
-                self._logger.debug(f"Adding new file {file_interface} with status {status}")
-                self._files[file_interface] = status
-                EMIT(f"state.file.{self._name}.added", file=file_interface, status=status)
+                action = "added"
             self._files[file_interface] = status
+
+        self._logger.debug(f"{action.title()}{' existing' if action == 'updated' else ''} file {file_interface} status to {status}")
+        EMIT(f"state.file.{self._name}.{action}", file=file_interface, status=status)
 
     def __setitem__(self, file_path: FilePath, status: FileStatus) -> None:
         """
@@ -104,7 +89,7 @@ class FileList:
             if file_interface not in self._files:
                 raise KeyError(f"File {file_interface} not found in FileList")
             del self._files[file_interface]
-            EMIT(f"state.file.{self._name}.deleted", file=file_interface)
+        EMIT(f"state.file.{self._name}.deleted", file=file_interface)
 
     def clear(self) -> None:
         """
@@ -112,7 +97,7 @@ class FileList:
         """
         with self._lock:
             self._files.clear()
-            EMIT(f"file.{self._name}.cleared")
+        EMIT(f"file.{self._name}.cleared")
         self._logger.debug("FileList cleared")
 
     def __contains__(self, file_path: FilePath) -> bool:
@@ -148,16 +133,22 @@ class FileList:
         Iterate over the file paths in the list.
         """
         with self._lock:
-            return iter(self._files.keys())
+            files = list(self._files.keys()).copy()
+        return iter(files)
+
+
+class Container:
+    pass
 
 
 class State:
     _controls_lock: Lock = Lock()
 
     def __init__(self):
+        self.container: Container = Container()
         self.tracked_files: FileList = FileList("tracked_files")
         self._controls: Dict[str, any] = {}
-        self._logger = logging.getLogger("table_modifier.state")
+        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     @property
     def controls(self) -> Dict[str, any]:
