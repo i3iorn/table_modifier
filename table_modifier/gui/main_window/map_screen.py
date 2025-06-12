@@ -1,6 +1,6 @@
 import logging
 
-from PyQt6.QtCore import Qt, QMimeData
+from PyQt6.QtCore import Qt, QMimeData, QPointF
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSpacerItem, QSizePolicy, \
     QListView, QLineEdit, QHBoxLayout, QDialog, QPushButton
 
@@ -8,22 +8,27 @@ from table_modifier.config.state import state
 from table_modifier.file_interface.excel import ExcelFileInterface
 from table_modifier.file_interface.factory import FileInterfaceFactory
 from table_modifier.localizer import String
-from table_modifier.signals import EMIT
+from table_modifier.signals import EMIT, ON
 
-
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDrag, QPixmap, QMouseEvent
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDrag, QPixmap, QMouseEvent, QPainter, QPen
 from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QFrame
 
 class DraggableLabel(QLabel):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Raised)
-        self.setStyleSheet("background-color: lightgray; padding: 4px; margin: 2px;")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setFixedSize(100, 40)
+        self.setStyleSheet("border: 2px solid transparent; border-radius: 6px;")
+        self.is_dragging = False
+        self.update_style()
+        ON("header.map.drop", self.update_style)
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
+            self.is_dragging = True
+            self.update_style()
+
             drag = QDrag(self)
             mime_data = QMimeData()
             mime_data.setText(self.text())
@@ -32,7 +37,21 @@ class DraggableLabel(QLabel):
             pixmap = QPixmap(self.size())
             self.render(pixmap)
             drag.setPixmap(pixmap)
+
             drag.exec(Qt.DropAction.MoveAction)
+
+            self.is_dragging = False
+            self.update_style()
+
+    def update_style(self, sender=None, **kwargs):
+        if sender and kwargs.get("text", None) == self.text():
+            self.setStyleSheet("border: 2px solid green; border-radius: 6px;")
+        else:
+            if self.is_dragging:
+                self.setStyleSheet("border: 2px solid #3399ff; border-radius: 6px;")
+            else:
+                self.setStyleSheet("border: 2px solid #ccc; border-radius: 6px;")
+
 
 
 class DropSlot(QLabel):
@@ -41,9 +60,10 @@ class DropSlot(QLabel):
         self.index = index
         self.setAcceptDrops(True)
         self.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
-        self.setStyleSheet("background-color: white; border: 1px dashed gray;")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setFixedSize(120, 40)
+        self.has_content = False
+        self.update_style()
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasText():
@@ -52,17 +72,69 @@ class DropSlot(QLabel):
     def dropEvent(self, event: QDropEvent):
         text = event.mimeData().text()
         self.setText(text)
-        self.setStyleSheet("background-color: lightblue; border: 1px solid blue;")
+        self.has_content = True
+        self.update_style()
+        EMIT("header.map.drop", index=self.index, text=text)
         event.acceptProposedAction()
 
+    def update_style(self):
+        if self.has_content:
+            self.setStyleSheet("border: 2px solid green; border-radius: 6px;")
+        else:
+            self.setStyleSheet("border: 2px solid #ccc; border-radius: 6px;")
+
+
+class MappingCanvas(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.mappings: list[tuple[QLabel, DropSlot]] = []
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setStyleSheet("background: transparent;")
+
+    def add_mapping(self, source: QLabel, target: DropSlot):
+        self.mappings.append((source, target))
+        self.update()
+
+    def clear_mappings(self):
+        self.mappings.clear()
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        pen = QPen(Qt.GlobalColor.darkBlue, 2)
+        painter.setPen(pen)
+
+        for source, target in self.mappings:
+            if not source.isVisible() or not target.isVisible():
+                continue
+
+            try:
+                start_center = source.rect().center()
+                end_center = target.rect().center()
+
+                start_global = source.mapToGlobal(start_center)
+                end_global = target.mapToGlobal(end_center)
+
+                start_local = self.mapFromGlobal(start_global)
+                end_local = self.mapFromGlobal(end_global)
+
+                painter.drawLine(QPointF(start_local), QPointF(end_local))
+            except RuntimeError as e:
+                # Sometimes happens if widget is being destroyed or re-parented
+                continue
+
+        painter.end()
 
 
 class MapScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.map_widget = None
         self.controls = None
         self.setLayout(QVBoxLayout())
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.canvas = MappingCanvas(self)
+        self.canvas.setGeometry(0, 0, self.width(), self.height())
         self.init_ui()
 
     def init_ui(self):
@@ -164,9 +236,13 @@ class MapScreen(QWidget):
             self.logger.warning("No headers found.")
             return
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Map Headers")
-        layout = QHBoxLayout(dialog)
+        if self.map_widget:
+            self.map_widget.close()
+            self.map_widget = None
+
+        self.map_widget = QWidget(self)
+        self.map_widget.setWindowTitle("Map Headers")
+        layout = QHBoxLayout(self.map_widget)
 
         # Left column (draggables)
         left_col = QVBoxLayout()
@@ -195,6 +271,48 @@ class MapScreen(QWidget):
         layout.addLayout(left_col)
         layout.addLayout(right_col)
 
-        dialog.setLayout(layout)
-        dialog.resize(600, 400)
-        dialog.exec()
+        self.map_widget.setLayout(layout)
+        self.layout().addWidget(self.map_widget)
+        ON("header.map.drop", self.on_header_drop)
+
+    def on_header_drop(self, sender, **kwargs):
+        """
+        Handle the drop event for headers and draw mapping arrow.
+
+        Args:
+            sender: str (event name, unused)
+            index: int
+                The index of the drop slot.
+            text: str
+                The dropped header label.
+
+        Returns:
+            None
+        """
+        index = kwargs.get("index")
+        text = kwargs.get("text")
+
+        # Match DraggableLabel by text
+        source_label = next((child for child in self.map_widget.findChildren(DraggableLabel) if child.text() == text),
+                            None)
+
+        if source_label:
+            drop_slot = self.drop_slots[index]
+            self.canvas.add_mapping(source_label, drop_slot)
+
+    def get_new_order(self):
+        """
+        Get the new order of headers based on the drop slots.
+
+        Returns:
+            list: A list of headers in the new order.
+        """
+        new_order = []
+        for slot in self.drop_slots:
+            if slot.text():
+                new_order.append(slot.text())
+        return new_order
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.canvas.setGeometry(0, 0, self.width(), self.height())

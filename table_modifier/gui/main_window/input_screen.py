@@ -1,3 +1,8 @@
+import sys
+import os
+from pathlib import Path
+from platformdirs import user_downloads_dir
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QSpacerItem, QSizePolicy, QWidget, \
     QLabel
@@ -5,6 +10,7 @@ from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QSpacerItem, QSizePolicy, 
 from table_modifier.gui.main_window.file_selector import FileSelectorWidget
 from table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
 from table_modifier.localizer import String
+from table_modifier.signals import EMIT
 
 
 class InputScreen(QWidget):
@@ -22,6 +28,9 @@ class InputScreen(QWidget):
 
         self.init_folder_selector()
         self.init_file_selector()
+
+        EMIT("directory.updated", directory=user_downloads_dir())
+
 
     def init_folder_selector(self):
         self.folder_selector = FolderSelectorWidget(self)
