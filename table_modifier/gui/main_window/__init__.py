@@ -15,6 +15,7 @@ class MainWindow(QMainWindow):
         ON("status.update", self.update_status_bar)
         self.setWindowTitle("Table Modifier")
         self.setGeometry(100, 100, 800, 600)
+
         self.main_layout = QVBoxLayout()
         self.init_ui()
 

@@ -68,6 +68,13 @@ class FileInterfaceProtocol(Protocol):
         Default chunksize=1000; adjust based on memory/throughput tradeoffs.
         """
 
+    def iter_columns(self, value_count: Optional[int] = None, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
+        """
+        Lazily read the file in “chunksize”‐column DataFrames.
+        Useful for column‐wise processing.
+        Default chunksize=1000; adjust based on memory/throughput tradeoffs.
+        """
+
     def stream_rows(self) -> Iterator[Dict[str, any]]:
         """
         Stream single rows as a dict mapping column→value.

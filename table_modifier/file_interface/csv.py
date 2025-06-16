@@ -47,6 +47,18 @@ class CSVFileInterface(FileInterfaceProtocol):
     def iter_load(self, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
         return pd.read_csv(self.path, chunksize=chunksize)
 
+    def iter_columns(self, value_count: Optional[int] = None, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
+        """
+        Iterate over columns in the CSV file, yielding DataFrames with one column at a time.
+        If value_count is specified, only yield that many values per column.
+        """
+        for chunk in pd.read_csv(self.path, chunksize=chunksize):
+            for col in chunk.columns:
+                if value_count is not None:
+                    yield chunk[[col]].head(value_count)
+                else:
+                    yield chunk[[col]]
+
     def stream_rows(self) -> Iterator[Dict[str, any]]:
         for chunk in self.iter_load(chunksize=1):
             yield chunk.iloc[0].to_dict()

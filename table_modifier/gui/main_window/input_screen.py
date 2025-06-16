@@ -1,6 +1,3 @@
-import sys
-import os
-from pathlib import Path
 from platformdirs import user_downloads_dir
 
 from PyQt6.QtCore import Qt

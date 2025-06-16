@@ -31,12 +31,3 @@ class FormatConverterProtocol(Protocol):
             str: file path of the converted data.
         """
         ...
-        for key, value in kwargs.items():
-            if not isinstance(value, str):
-                raise TypeError(f"Expected str for {key}, got {type(value).__name__}")
-
-        for row in self.source.stream_rows():
-            if not isinstance(row, dict):
-                raise TypeError(f"Expected dict for row, got {type(row).__name__}")
-
-            self.target_format.append_list([row])

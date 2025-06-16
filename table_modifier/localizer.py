@@ -9,6 +9,11 @@ class Localizer:
         self._load_translations(locale_dir)
 
     def _load_translations(self, locale_dir):
+        """Load translations from JSON files in the specified directory."""
+        if not os.path.exists(locale_dir):
+            # Create the directory if it does not exist
+            os.makedirs(locale_dir)
+
         for filename in os.listdir(locale_dir):
             if filename.endswith('.json'):
                 lang_code = filename[:-5]  # remove '.json'
@@ -38,4 +43,4 @@ class Localizer:
         return self.translate(key) if key in self.translations.get(self.current_language, {}) else default or key
 
 
-String = Localizer(locale_dir='localization', default_language='en')
+String = Localizer(locale_dir='table_modifier/localization', default_language='en')

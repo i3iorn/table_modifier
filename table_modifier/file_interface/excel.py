@@ -75,6 +75,20 @@ class ExcelFileInterface(FileInterfaceProtocol):
         for start in range(0, len(df), chunksize):
             yield df.iloc[start : start + chunksize]
 
+    def iter_columns(self, value_count: Optional[int] = None, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
+        """
+        Iterate over columns in chunks.
+        If value_count is specified, yield only that many values per column.
+        """
+        self._ensure_sheet()
+        df = self._df if self._df is not None else self.load()
+        for col in df.columns:
+            col_data = df[col]
+            if value_count is not None:
+                col_data = col_data.head(value_count)
+            for start in range(0, len(col_data), chunksize):
+                yield pd.DataFrame({col: col_data.iloc[start : start + chunksize]})
+
     def stream_rows(self) -> Iterator[Dict[str, Any]]:
         for chunk in self.iter_load(chunksize=1):
             yield chunk.iloc[0].to_dict()
