@@ -2,7 +2,7 @@ from PyQt6.QtCore import Qt, QMimeData
 from PyQt6.QtGui import QMouseEvent, QDrag, QPixmap
 from PyQt6.QtWidgets import QLabel, QFrame
 
-from table_modifier.signals import ON
+from table_modifier.signals import ON, EMIT
 
 
 class DraggableLabel(QLabel):
@@ -20,6 +20,7 @@ class DraggableLabel(QLabel):
         self.is_dragging = False
         self.update_style()
         ON("header.map.drop", self.update_style)
+        ON("header.map.double_click", self.update_style)
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -39,6 +40,10 @@ class DraggableLabel(QLabel):
 
             self.is_dragging = False
             self.update_style()
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        EMIT("header.map.double_click", text=self.text())
+        event.accept()
 
     def update_style(self, sender=None, **kwargs):
         if sender and kwargs.get("text", None) == self.text():

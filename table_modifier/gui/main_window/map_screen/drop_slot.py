@@ -1,8 +1,8 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
 from PyQt6.QtWidgets import QLabel, QFrame
 
-from table_modifier.signals import EMIT
+from table_modifier.signals import EMIT, ON
 
 
 class DropSlot(QLabel):
@@ -19,6 +19,7 @@ class DropSlot(QLabel):
         background: #f9f9f9;
         """)
         self.update_style()
+        ON("header.map.double_click", self._on_doubleclick)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasText():
@@ -26,11 +27,28 @@ class DropSlot(QLabel):
 
     def dropEvent(self, event: QDropEvent):
         text = event.mimeData().text()
+        self._update_text(text)
+        event.acceptProposedAction()
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.deleteLater()
+        event.accept()
+
+    def is_empty(self) -> bool:
+        return not self.has_content
+
+    def _on_doubleclick(self, sender, text: str, **kwargs):
+        if not self.has_content:
+            self._update_text(text)
+            return True
+        return False
+
+    def _update_text(self, text: str):
         self.setText(text)
-        self.has_content = True
+        self.has_content = bool(text.strip())
         self.update_style()
         EMIT("header.map.drop", index=self.index, text=text)
-        event.acceptProposedAction()
 
     def update_style(self):
         if self.has_content:

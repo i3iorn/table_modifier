@@ -5,8 +5,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLabel,
-    QSpacerItem,
-    QSizePolicy,
     QListView,
     QLineEdit,
     QHBoxLayout,
@@ -17,9 +15,9 @@ from PyQt6.QtWidgets import (
 
 from table_modifier.classifier import ColumnTypeClassifier, DetectorRegistry
 from table_modifier.config.state import state
+from table_modifier.constants import NO_MARGIN
 from table_modifier.file_interface.excel import ExcelFileInterface
 from table_modifier.file_interface.factory import FileInterfaceFactory
-from table_modifier.gui.main_window.map_screen.canvas import MappingCanvas
 from table_modifier.gui.main_window.map_screen.draggable_label import DraggableLabel
 from table_modifier.gui.main_window.map_screen.drop_slot import DropSlot
 from table_modifier.localizer import String
@@ -32,22 +30,20 @@ class MapScreen(QWidget):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.skip_rows_input = None
         self.drop_slots = []
-        self.sheet_dialog = None
 
         # Canvas and drag-drop container
         self.map_widget = QScrollArea(self)
         self.map_widget.setWidgetResizable(True)
         self.drag_drop_container = QWidget()
+        self.drag_drop_container.setStyleSheet("border: none;")
         self.drag_drop_layout = QHBoxLayout(self.drag_drop_container)
+        self.drag_drop_layout.setContentsMargins(*NO_MARGIN)
         self.map_widget.setWidget(self.drag_drop_container)
 
         # Main UI setup
         self._init_layout()
         self._init_controls()
         self.layout().addWidget(self.map_widget)
-
-        self.canvas = MappingCanvas(self)
-        self.canvas.setGeometry(0, 0, self.width(), self.height())
 
     def _init_layout(self):
         main_layout = QVBoxLayout(self)
@@ -58,13 +54,6 @@ class MapScreen(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         main_layout.addWidget(title)
-
-        # Spacer for controls
-        """
-        main_layout.addItem(
-            QSpacerItem(1, 1, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        )
-        """
 
     def _init_controls(self):
         layout = self.layout()
@@ -80,6 +69,10 @@ class MapScreen(QWidget):
         view.setMaximumHeight(8 * 20)
         view.clicked.connect(self._on_item_clicked)
         layout.addWidget(view)
+
+    def _drop_slots_available(self) -> bool:
+        """Check if there are any available drop slots."""
+        return any(slot.is_empty() for slot in self.drop_slots)
 
     def _on_item_clicked(self, index):
         if not index.isValid():
@@ -99,30 +92,31 @@ class MapScreen(QWidget):
             self.logger.warning("No sheets found in Excel file.")
             return
 
-        dialog = QDialog(self)
-        layout = QVBoxLayout(dialog)
-        dialog.setLayout(layout)
+        self.sheet_dialog = QDialog(self)
+        layout = QVBoxLayout(self.sheet_dialog)
+        self.sheet_dialog.setLayout(layout)
         layout.addWidget(QLabel("Select a sheet to map:"))
 
         for sheet in sheets:
-            btn = QPushButton(sheet, dialog)
+            btn = QPushButton(sheet, self.sheet_dialog)
             btn.clicked.connect(lambda _, s=sheet: self._handle_sheet_selected(s))
             layout.addWidget(btn)
 
-        dialog.exec()
+        self.sheet_dialog.exec()
 
     def _handle_sheet_selected(self, sheet_name: str):
-        self.sheet_dialog.accept() if self.sheet_dialog else None
         first_index = state.container.selected_files_model.index(0)
         path = state.container.selected_files_model.data(
             first_index, role=Qt.ItemDataRole.UserRole
         )
         file_interface = FileInterfaceFactory.create(path)
-        self._show_mapping(file_interface, sheet_name)
+        file_interface.sheet_name = sheet_name
+        self._show_mapping(file_interface)
+        self.sheet_dialog.close()
 
-    def _show_mapping(self, file_interface, sheet_name=None):
-        self.logger.info(f"Mapping {file_interface} sheet={sheet_name}")
-        headers = file_interface.get_headers(sheet_name)
+    def _show_mapping(self, file_interface):
+        self.logger.info(f"Mapping {file_interface}")
+        headers = file_interface.get_headers()
         if not headers:
             self.logger.warning("No headers found.")
             return
@@ -135,7 +129,9 @@ class MapScreen(QWidget):
     def _classify_columns(self, file_interface):
         classifier = ColumnTypeClassifier(DetectorRegistry)
         for col in file_interface.iter_columns(100):
-            self.logger.info(classifier.classify(list(col)).candidates)
+            col_name = col.columns[0]
+            result = classifier.classify(col[col_name].tolist(), col_name)
+            self.logger.debug(f"Classified column '{col_name:<60s}': {str(result.candidates)} -- Example: {result.example_values}")
 
     def _clear_drag_drop(self):
         # Clear existing widgets and layouts
@@ -154,21 +150,35 @@ class MapScreen(QWidget):
         self.drop_slots.clear()
 
     def _build_drag_drop(self, headers):
-        # Left: available headers
-        left_layout = QVBoxLayout()
+        # --- LEFT COLUMN ---
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
         left_layout.addWidget(QLabel("Available Headers"))
         for header in headers:
-            left_layout.addWidget(DraggableLabel(header))
+            label = DraggableLabel(header)
+            left_layout.addWidget(label)
+
         left_layout.addStretch()
 
-        # Right: target mapping slots
-        right_layout = QVBoxLayout()
-        right_layout.addWidget(QLabel("Target Mapping Order"))
-        self._add_drop_slot(right_layout)
-        right_layout.addStretch()
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setWidget(left_container)
 
-        self.drag_drop_layout.addLayout(left_layout)
-        self.drag_drop_layout.addLayout(right_layout)
+        # --- RIGHT COLUMN ---
+        right_container = QWidget()
+        self.right_layout = QVBoxLayout(
+            right_container)  # Store for drop slot addition
+        self.right_layout.addWidget(QLabel("Target Mapping Order"))
+        self._add_drop_slot(self.right_layout)
+        self.right_layout.addStretch()
+
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setWidget(right_container)
+
+        # Add scrollable containers to the main layout
+        self.drag_drop_layout.addWidget(left_scroll)
+        self.drag_drop_layout.addWidget(right_scroll)
 
     def _add_drop_slot(self, layout):
         slot = DropSlot(index=len(self.drop_slots))
@@ -176,15 +186,12 @@ class MapScreen(QWidget):
         layout.addWidget(slot)
         return slot
 
-    def _on_header_drop(self, sender, index: int, text: str, **kwargs):
-        src = self._find_label_by_text(text)
-        if src:
-            self.canvas.add_mapping(src, self.drop_slots[index])
-        # Extend slots
-        right_layout = self.drag_drop_layout.itemAt(1).layout()
-        right_layout.removeItem(right_layout.itemAt(right_layout.count() - 1))
-        self._add_drop_slot(right_layout)
-        right_layout.addStretch()
+    def _on_header_drop(self, sender, text: str, **kwargs):
+        # Remove stretch and add a new slot
+        if not self._drop_slots_available():
+            stretch = self.right_layout.takeAt(self.right_layout.count() - 1)
+            self._add_drop_slot(self.right_layout)
+            self.right_layout.addStretch()
 
     def _find_label_by_text(self, text):
         return next(
@@ -195,7 +202,3 @@ class MapScreen(QWidget):
 
     def get_new_order(self):
         return [slot.text() for slot in self.drop_slots if slot.text()]
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.canvas.setGeometry(0, 0, self.width(), self.height())
