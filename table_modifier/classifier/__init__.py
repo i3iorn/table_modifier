@@ -1,13 +1,14 @@
 import difflib
-from typing import List, Optional, Dict, Type
+from typing import List, Optional, Dict, Type, Any
 
-from .detectors.date import DateDetector
-from .detectors.duns import DunsDetector
-from .detectors.email import EmailDetector
-from .detectors.hyphenated_integer import HyphenatedIntegerDetector, IntegerDetector
-from .detectors.name import NameDetector
+import pandas as pd
+
+from .detectors.boolean import *
+from .detectors.text import *
+from .detectors.numeric import *
 from .registry import DetectorRegistry
 from .result import ClassificationResult
+from .utils import normalize_numeral
 
 
 class ColumnTypeClassifier:
@@ -18,7 +19,7 @@ class ColumnTypeClassifier:
 
     def classify(
         self,
-        values: List[str],
+        values: List[Any],
         column_name: Optional[str] = None
     ) -> ClassificationResult:
         """Classifies a column using all applicable detectors.
@@ -30,32 +31,57 @@ class ColumnTypeClassifier:
         Returns:
             ClassificationResult containing scored types.
         """
+        values = [None if pd.isna(x) else x for x in values]
         name = column_name.lower() if column_name else ""
         candidates: Dict[str, float] = {}
 
+        #print(f"\n=====================================================================\nClassifying column '{column_name}' with values: {values[:5]}...")
         for detector in self.registry.get_detectors():
             if not detector.is_applicable(values):
                 continue
 
             score = detector.detect(values)
+            if score == 0.0:
+                continue
+            #print(f"Detector: {detector.type_name()}, Score: {score:.2f}")
 
             # Name-based boost
-            if any(kw in name for kw in detector.keywords):
+            if any(kw in name for kw in detector.keywords()):
                 score += 0.1
+                #print(f"Boosted {detector.type_name()} for keywords in name: {detector.keywords()} to {score:.2f}")
             else:
-                sim = difflib.SequenceMatcher(None, name, detector.type_name).ratio()
-                score += sim * 0.05
+                sim = difflib.SequenceMatcher(None, name, detector.type_name()).ratio()
+                score += max(sim, 0.0) * 0.05
+                #print(f"Similarity boost for {detector.type_name()}: {sim:.2f} to {score:.2f}")
 
-            score = min(score, 1.0)
+            score = normalize_numeral(score)
+
             if score > 0.0:
-                candidates[detector.type_name] = score
+                candidates[detector.type_name()] = score
 
-        return ClassificationResult(column_name=column_name, candidates=candidates)
+        # Loop through candidates and adjust scores based on parent-child relationships
+        for candidate in list(candidates.keys()):
+            detector = self.registry._registry[candidate]
+            parent = detector.parent_type()
+            if parent and parent in candidates:
+                # If this candidate has a parent, adjust its score based on the parents score
+                parent_score = candidates[parent]
+                candidates[candidate] = candidates[candidate] + parent_score / 5
 
+        return ClassificationResult(
+            column_name=column_name,
+            candidates=candidates,
+            example_values=[v for v in values if str(v).strip()][:3]
+        )
 
-DunsDetector()
-EmailDetector()
-IntegerDetector()
-HyphenatedIntegerDetector()
-DateDetector()
+TextDetector()
+BooleanDetector()
+NumericDetector()
 NameDetector()
+CompanyNameDetector()
+DunsDetector()
+CountryCodeDetector()
+NumericalCategoryDetector()
+TextCategoryDetector()
+CountryNameDetector()
+CurrencyCodeDetector()

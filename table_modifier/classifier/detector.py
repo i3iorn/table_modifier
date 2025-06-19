@@ -1,33 +1,79 @@
+import logging
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Any, Type
 
-from table_modifier.classifier.check import MustCheck, MustNotCheck, MightCheck, \
-    MightNotCheck
+from table_modifier.classifier import normalize_numeral
+from table_modifier.classifier.check import AbstractCheck
 from table_modifier.classifier.registry import DetectorRegistry
 
 
 class Detector(ABC):
     """Abstract base class for all column-type detectors."""
-    type_name: str             # Unique type identifier
-    parent_type: Optional[str] # Name of a more generic parent type
-    keywords: Optional[List[str]] = None  # Optional keywords for this type
-
-    def __init__(self):
+    def __init__(self, checks: List[AbstractCheck[Any]] = None):
         """
         Initialize the detector with a type name and an optional parent type.
-
-        :param type_name: Unique identifier for this detector type.
-        :param parent_type: Name of a more generic parent type, if applicable.
         """
         DetectorRegistry.register(self)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._checks = checks or []
 
-    @abstractmethod
+    def add_check(self, check: AbstractCheck[Any]) -> None:
+        """
+        Add a check to this detector.
+        This allows dynamic addition of checks after initialization.
+        """
+        if not isinstance(check, AbstractCheck):
+            raise TypeError("check must be an instance of AbstractCheck")
+        self._checks.append(check)
+        self.logger.debug(f"Added check {check.name()} to detector {self.type_name()}")
+
+    def depth(self) -> int:
+        """
+        Return the depth of this detector in the type hierarchy.
+        The depth is defined as the number of parent types in the hierarchy.
+        """
+        depth = 0
+        current = self.parent_type()
+        while current:
+            depth += 1
+            current = DetectorRegistry._registry[current].parent_type()
+        return depth
+
+    def checks(self) -> List[AbstractCheck[Any]]:
+        """
+        Return the list of checks associated with this detector.
+        This allows dynamic addition of checks after initialization.
+        """
+        return self._checks
+
     def detect(self, values: List[str]) -> float:
         """
         Assess how well the column values match this type.
         Returns a score in [0.0, 1.0], with 1.0 for a perfect match.
         """
-        pass
+        score = 0.0
+        check_done = set()
+
+        for check in self.checks():
+            if check.is_applicable(values):
+                score += check.run(values)
+                check_done.add(check.name)
+
+        if not check_done:
+            self.logger.debug(f"No applicable checks for detector {self.type_name()}")
+
+        # Normalize the score based on the number of checks run
+        if check_done:
+            score /= len(check_done)
+
+        return normalize_numeral((score * self.depth()) ** (1 + len(check_done)/10))
+
+    def example_values(self) -> List[str]:
+        """
+        Return a list of example values that represent this type.
+        This is used for debugging and documentation purposes.
+        """
+        return []
 
     def is_applicable(self, values: List[str]) -> bool:
         """
@@ -36,27 +82,24 @@ class Detector(ABC):
         """
         return True
 
+    def keywords(self) -> List[str]:
+        """
+        Return a list of keywords that this detector matches against column names.
+        This helps boost scores when the column name matches these keywords.
+        """
+        return []
 
-class CheckBasedDetector(Detector, ABC):
-    def __init__(self):
-        super().__init__()
-        self.must_checks: List[MustCheck] = []
-        self.must_not_checks: List[MustNotCheck] = []
-        self.might_checks: List[MightCheck] = []
-        self.might_not_checks: List[MightNotCheck] = []
+    @classmethod
+    def parent_type(cls) -> str:
+        """
+        Return the name of the parent type, if this detector is a specialization.
+        """
+        return cls.__bases__[0].__name__.replace("Detector", "").lower() if cls.__bases__ else None
 
-    def detect(self, values: List[str]) -> float:
-        for check in self.must_checks + self.must_not_checks:
-            if check.run(values) < 1.0:
-                return 0.0
-
-        weighted_scores = []
-        total_weight = 0.0
-
-        for check in self.might_checks + self.might_not_checks:
-            score = check.run(values)
-            weight = check.weight
-            weighted_scores.append(score * weight)
-            total_weight += weight
-
-        return sum(weighted_scores) / total_weight if total_weight else 1.0
+    @classmethod
+    def type_name(cls) -> str:
+        """
+        Return the name of the type this detector classifies.
+        This should be unique across all detectors.
+        """
+        return cls.__name__.replace("Detector", "").lower()
