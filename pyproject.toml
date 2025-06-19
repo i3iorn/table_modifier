@@ -1,16 +1,75 @@
-[tool.poetry]
+[project]
 name = "table_modifier"
 version = "0.1.0"
 description = "A project for modifying tables with GUI and file interface support."
-authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Björn Schrammel", email = "table_modifier@schrammel.dev" }
+]
+requires-python = ">=3.8"
+keywords = ["tables", "GUI", "CSV", "data manipulation", "file interface"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities"
+]
+
+[project.urls]
+Homepage = "https://github.com/i3iorn/table_modifier"
+Repository = "https://github.com/i3iorn/table_modifier"
+Issues = "https://github.com/i3iorn/table_modifier/issues"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-blinker = "*"
+python = "^3.9"
 
-[tool.poetry.dev-dependencies]
-pytest = "*"
+# Core dependencies
+blinker = "^1.7"
+loghelpers = { git = "https://github.com/i3iorn/loghelpers.git" }
+
+# Optional features
+pandas = { version = "^2.2", optional = true }
+
+[tool.poetry.extras]
+file = ["pandas"]
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4"
+flake8 = "^7.0"
+isort = "^5.13"
+mypy = "^1.10"
+pre-commit = "^3.7"
+pytest = "^8.2"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+force_single_line = true
+known_first_party = ["table_modifier"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [".venv", "build", "dist"]
+
+[tool.mypy]
+python_version = "3.8"
+ignore_missing_imports = true
+strict = true
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"
