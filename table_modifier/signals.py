@@ -75,7 +75,6 @@ class EventBus:
                 raise ValueError("Wildcards must end with '*' (e.g., 'x.y.*'). Use 'x.y.*' for wildcard subscriptions.")
             else:
                 self._get_signal(name).connect(handler)
-                self._logger.debug(f"[EventBus] Subscribed handler to signal '{name}'")
 
     def off(self, name: str, handler: Callable) -> None:
         """

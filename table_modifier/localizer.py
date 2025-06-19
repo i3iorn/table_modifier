@@ -1,5 +1,7 @@
 import json
 import os
+from pathlib import Path
+
 
 class Localizer:
     def __init__(self, locale_dir: str, default_language='en'):
@@ -43,4 +45,7 @@ class Localizer:
         return self.translate(key) if key in self.translations.get(self.current_language, {}) else default or key
 
 
-String = Localizer(locale_dir='table_modifier/localization', default_language='en')
+String = Localizer(
+    locale_dir=Path(__file__).parent.joinpath("localization").as_posix(),
+    default_language='en'
+)
