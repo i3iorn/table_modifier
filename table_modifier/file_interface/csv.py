@@ -1,8 +1,9 @@
+import csv
 import os
 from pathlib import Path
-from typing import Optional, Iterator, Dict
+from typing import Optional, Iterator, Dict, List
 
-import pandas as pd
+from pandas import DataFrame, read_csv
 
 from .factory import FileInterfaceFactory
 from .protocol import FileInterfaceProtocol
@@ -13,20 +14,22 @@ class CSVFileInterface(FileInterfaceProtocol):
 
     def __init__(self, file_path: str, **kwargs):
         self.path = Path(file_path)
-        self._df: Optional[pd.DataFrame] = None
+        self._df: Optional[DataFrame] = None
         self._file = None
         self._delimiter = kwargs.get("delimiter", ",")
 
-    def get_headers(self, sheet_name: str = None) -> Optional[list[str]]:
+    def get_headers(self, sheet_name: str = None) -> List[str] | None:
         """
         Returns the header row of the CSV file if it exists.
         If no header is present, returns None.
         """
-        with open(self.path, mode="r", newline="") as f:
-            for line in f:
-                if line.strip():
-                    return line.strip().split(self._delimiter)
-        return None
+        with open(self.path, newline="") as f:
+            sample = f.read(2048)
+            f.seek(0)
+            dialect = csv.Sniffer().sniff(sample, delimiters=self._delimiter)
+            reader = csv.reader(f, dialect)
+            headers = next(reader, None)
+            return headers if headers and any(headers) else None
 
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
@@ -40,30 +43,31 @@ class CSVFileInterface(FileInterfaceProtocol):
         if self._file:
             self._file.close()
 
-    def load(self) -> pd.DataFrame:
-        self._df = pd.read_csv(self.path)
+    def load(self) -> DataFrame:
+        self._df = read_csv(self.path)
         return self._df
 
-    def iter_load(self, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
-        return pd.read_csv(self.path, chunksize=chunksize)
+    def iter_load(self, chunksize: int = 1_000) -> Iterator[DataFrame]:
+        return read_csv(self.path, chunksize=chunksize)
 
-    def iter_columns(self, value_count: Optional[int] = None, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
+    def iter_columns(self, value_count: Optional[int] = None, chunksize: int = 1_000) -> Iterator[DataFrame]:
         """
         Iterate over columns in the CSV file, yielding DataFrames with one column at a time.
         If value_count is specified, only yield that many values per column.
         """
-        for chunk in pd.read_csv(self.path, chunksize=chunksize):
+        for chunk in read_csv(self.path, chunksize=chunksize):
             for col in chunk.columns:
-                if value_count is not None:
-                    yield chunk[[col]].head(value_count)
-                else:
-                    yield chunk[[col]]
+                col_series = chunk[col]
+                yield col_series.head(value_count) if value_count else col_series
 
     def stream_rows(self) -> Iterator[Dict[str, any]]:
         for chunk in self.iter_load(chunksize=1):
             yield chunk.iloc[0].to_dict()
 
     def save(self) -> None:
+        """
+        Save the current DataFrame to the original file path.
+        """
         self.save_as(self.path.as_posix())
 
     def save_as(self, file_path: str) -> None:
@@ -75,7 +79,7 @@ class CSVFileInterface(FileInterfaceProtocol):
         if self._df is None:
             # peek at first row
             skip_rows = self._skip_rows if hasattr(self, '_skip_rows') else 0
-            df = pd.read_csv(self.path, skiprows=skip_rows, nrows=1)
+            df = read_csv(self.path, skiprows=skip_rows, nrows=1)
         else:
             df = self._df
         return {str(col): str(dtype) for col, dtype in df.dtypes.items()}
@@ -84,7 +88,7 @@ class CSVFileInterface(FileInterfaceProtocol):
         # CSV has no extra metadata beyond headers
         return {"columns": list(self.get_schema().keys())}
 
-    def validate(self, df: pd.DataFrame) -> None:
+    def validate(self, df: DataFrame) -> None:
         if any(col is None or col == "" for col in df.columns):
             raise ValueError("Empty column name detected in CSV")
 
