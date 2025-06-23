@@ -1,3 +1,4 @@
+from .setup import ROOT_PATH
 from PyQt6.QtWidgets import QComboBox
 
 controls = {

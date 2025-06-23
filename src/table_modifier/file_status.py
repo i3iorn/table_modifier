@@ -13,8 +13,11 @@ class FileStage(IntEnum):
     PROCESSED = auto()
     ARCHIVED = auto()
 
-    def __lt__(self, other):
-        return self.value < other.value
+    def __lt__(self, other: "FileStage") -> bool:
+        if isinstance(other, FileStage):
+            return self.value < other.value
+        else:
+            return NotImplemented
 
     def __str__(self):
         return self.name.lower()
@@ -30,7 +33,13 @@ class FileFlag(Flag):
     VALID = auto()
     EXPORTED = auto()
     PENDING = auto()
+    ERROR = auto()
+    DELETED = auto()
 
+    def __str__(self) -> str:
+        if self == FileFlag.UNKNOWN:
+            return "unknown"
+        return "|".join(flag.name.lower() for flag in FileFlag if flag in self and flag != FileFlag.UNKNOWN)
 
 @dataclass
 class FileStatus:
@@ -44,5 +53,5 @@ class FileStatus:
     stage: FileStage = FileStage.NEW
     flags: FileFlag = FileFlag.UNKNOWN
 
-    def __str__(self):
-        return f"FileStatus(stage={self.stage}, flags={self.flags})"
+    def __repr__(self):
+        return f"FileStatus(stage={self.stage!r}, flags={self.flags!r})"

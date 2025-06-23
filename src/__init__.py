@@ -4,7 +4,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from qasync import QEventLoop
 
-from table_modifier.gui.main_window import MainWindow
+from src.table_modifier.gui.main_window import MainWindow
 
 
 logging.basicConfig(

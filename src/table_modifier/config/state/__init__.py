@@ -2,10 +2,10 @@ import logging
 from threading import Lock
 from typing import Dict, Any, List
 
-from table_modifier.file_interface.protocol import FileInterfaceProtocol
-from table_modifier.file_interface.utils import from_file_path, FilePath
-from table_modifier.file_status import FileStatus
-from table_modifier.signals import EMIT
+from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
+from src.table_modifier.file_interface.utils import from_file_path, FilePath
+from src.table_modifier.file_status import FileStatus
+from src.table_modifier.signals import EMIT
 
 
 class FileList:

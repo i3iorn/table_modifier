@@ -1,6 +1,8 @@
 import json
-import os
+import logging
 from pathlib import Path
+
+from src.table_modifier.config import ROOT_PATH
 
 
 class Localizer:
@@ -11,16 +13,15 @@ class Localizer:
         self._load_translations(locale_dir)
 
     def _load_translations(self, locale_dir):
-        """Load translations from JSON files in the specified directory."""
-        if not os.path.exists(locale_dir):
-            # Create the directory if it does not exist
-            os.makedirs(locale_dir)
-
-        for filename in os.listdir(locale_dir):
-            if filename.endswith('.json'):
-                lang_code = filename[:-5]  # remove '.json'
-                with open(os.path.join(locale_dir, filename), 'r', encoding='utf-8') as f:
-                    self.translations[lang_code] = json.load(f)
+        locale_path = Path(locale_dir)
+        locale_path.mkdir(parents=True, exist_ok=True)
+        for json_file in locale_path.glob('*.json'):
+            lang_code = json_file.stem
+            try:
+                data = json.loads(json_file.read_text(encoding='utf-8'))
+                self.translations[lang_code] = data
+            except json.JSONDecodeError as e:
+                logging.warning(f"Skipping {json_file.name}: invalid JSON ({e})")
 
     def set_language(self, lang_code):
         if lang_code in self.translations:
@@ -46,6 +47,6 @@ class Localizer:
 
 
 String = Localizer(
-    locale_dir=Path(__file__).parent.joinpath("localization").as_posix(),
+    locale_dir=ROOT_PATH.joinpath("locales").as_posix(),
     default_language='en'
 )

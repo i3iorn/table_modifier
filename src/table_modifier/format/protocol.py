@@ -1,6 +1,6 @@
 from typing import Protocol, Any
 
-from table_modifier.file_interface.protocol import FileInterfaceProtocol
+from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
 
 
 class FormatConverterProtocol(Protocol):
