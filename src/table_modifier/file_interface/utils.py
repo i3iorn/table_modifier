@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from table_modifier.file_interface.factory import FileInterfaceFactory
-from table_modifier.file_interface.protocol import FileInterfaceProtocol
+from src.table_modifier.file_interface.factory import FileInterfaceFactory
+from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
 
 FilePath = str | Path | FileInterfaceProtocol
 

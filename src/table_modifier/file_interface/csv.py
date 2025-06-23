@@ -1,18 +1,20 @@
 import csv
 import os
 from pathlib import Path
-from typing import Optional, Iterator, Dict, List
+from typing import Optional, Iterator, Dict, List, Any
 
 from pandas import DataFrame, read_csv
 
 from .factory import FileInterfaceFactory
 from .protocol import FileInterfaceProtocol
+from .utils import FilePath
 
 
 class CSVFileInterface(FileInterfaceProtocol):
     file_type = "csv"
 
-    def __init__(self, file_path: str, **kwargs):
+    def __init__(self, file_path: FilePath, **kwargs):
+        self._cached_headers = None
         self.path = Path(file_path)
         self._df: Optional[DataFrame] = None
         self._file = None
@@ -23,13 +25,16 @@ class CSVFileInterface(FileInterfaceProtocol):
         Returns the header row of the CSV file if it exists.
         If no header is present, returns None.
         """
-        with open(self.path, newline="") as f:
-            sample = f.read(2048)
-            f.seek(0)
-            dialect = csv.Sniffer().sniff(sample, delimiters=self._delimiter)
-            reader = csv.reader(f, dialect)
-            headers = next(reader, None)
-            return headers if headers and any(headers) else None
+        if not hasattr(self, "_cached_headers") or self._cached_headers is None:
+            with open(self.path, newline="") as f:
+                sample = f.read(2048)
+                f.seek(0)
+                dialect = csv.Sniffer().sniff(sample, delimiters=self._delimiter)
+                reader = csv.reader(f, dialect)
+                headers = next(reader, None)
+                self._cached_headers = headers
+
+        return self._cached_headers
 
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
@@ -39,13 +44,22 @@ class CSVFileInterface(FileInterfaceProtocol):
         self._file = open(self.path, mode="r", newline="")
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
         if self._file:
             self._file.close()
+            self._file = None
+            return False  # Do not suppress exceptions
+        return True  # Suppress exceptions if no file was opened
 
     def load(self) -> DataFrame:
-        self._df = read_csv(self.path)
-        return self._df
+        logger.debug("Loading CSV from %s", self.path)
+        try:
+            df = read_csv(self.path)
+        except Exception as e:
+            logger.error("Failed to load CSV: %s", e)
+            raise
+        self._df = df
+        return df
 
     def iter_load(self, chunksize: int = 1_000) -> Iterator[DataFrame]:
         return read_csv(self.path, chunksize=chunksize)
@@ -60,7 +74,7 @@ class CSVFileInterface(FileInterfaceProtocol):
                 col_series = chunk[col]
                 yield col_series.head(value_count) if value_count else col_series
 
-    def stream_rows(self) -> Iterator[Dict[str, any]]:
+    def stream_rows(self) -> Iterator[Dict[str, Any]]:
         for chunk in self.iter_load(chunksize=1):
             yield chunk.iloc[0].to_dict()
 

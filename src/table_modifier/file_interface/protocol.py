@@ -39,7 +39,7 @@ class FileInterfaceProtocol(Protocol):
         """Optional: open any heavy resources (e.g. file handles)."""
         ...
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type, exc, tb) -> bool:
         """Optional: clean up resources on context exit."""
         ...
 
