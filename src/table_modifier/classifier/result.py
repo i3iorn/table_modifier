@@ -1,6 +1,6 @@
 from typing import Optional, Tuple, List, Dict
 
-from table_modifier.classifier.registry import DetectorRegistry
+from src.table_modifier.classifier.registry import DetectorRegistry
 
 
 class ClassificationResult:

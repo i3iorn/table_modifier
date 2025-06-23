@@ -16,6 +16,7 @@ class NumericDetector(Detector):
         return any(isinstance(v, (int, float)) or (isinstance(v, str) and v.strip().isdigit())
                    for v in values)
 
+
 class DunsDetector(NumericDetector):
     def __init__(self):
         super().__init__()
@@ -24,8 +25,18 @@ class DunsDetector(NumericDetector):
         self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
         self.add_check(UniquenessCheck(min_uniqueness=0.8))
 
+
 class NumericalCategoryDetector(NumericDetector):
     def __init__(self):
         super().__init__()
         self.add_check(VarianceCheck(max_variance=0.2))
         self.add_check(UniquenessCheck(max_uniqueness=0.1))
+
+
+class ZipCodeDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(r"^\d{5}(-\d{4})?$", name="zip_code_check"))
+        self.add_check(PatternCheck(r"^\d{5}$", weight=1.2, name="zip_code_5_digit_check"))
+        self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))

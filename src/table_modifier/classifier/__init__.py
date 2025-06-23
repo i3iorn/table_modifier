@@ -1,11 +1,8 @@
 import difflib
-from typing import List, Optional, Dict, Type, Any
+from pandas import isna
+from typing import List, Optional, Type, Any, Dict
 
-import pandas as pd
-
-from .detectors.boolean import *
-from .detectors.text import *
-from .detectors.numeric import *
+from src.table_modifier.classifier.detectors import *
 from .registry import DetectorRegistry
 from .result import ClassificationResult
 from .utils import normalize_numeral
@@ -31,7 +28,7 @@ class ColumnTypeClassifier:
         Returns:
             ClassificationResult containing scored types.
         """
-        values = [None if pd.isna(x) else x for x in values]
+        values = [None if isna(x) else x for x in values]
         name = column_name.lower() if column_name else ""
         candidates: Dict[str, float] = {}
 

@@ -4,9 +4,9 @@ from typing import List, Optional
 
 from PyQt6.QtCore import QAbstractListModel, Qt
 
-from table_modifier.config.state import state
-from table_modifier.file_interface.factory import FileInterfaceFactory
-from table_modifier.file_interface.protocol import FileInterfaceProtocol
+from src.table_modifier.config.state import state
+from src.table_modifier.file_interface.factory import FileInterfaceFactory
+from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
 
 
 class FileModel(QAbstractListModel):

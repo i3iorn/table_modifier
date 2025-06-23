@@ -1,10 +1,10 @@
 import logging
-from abc import ABC, abstractmethod
-from typing import Optional, List, Any, Type
+from abc import ABC
+from typing import List, Any
 
-from table_modifier.classifier import normalize_numeral
-from table_modifier.classifier.check import AbstractCheck
-from table_modifier.classifier.registry import DetectorRegistry
+from src.table_modifier.classifier import normalize_numeral
+from src.table_modifier.classifier.check import AbstractCheck
+from src.table_modifier.classifier.registry import DetectorRegistry
 
 
 class Detector(ABC):

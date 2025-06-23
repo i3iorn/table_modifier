@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from table_modifier.classifier import BaseCheck, MatchCountCheckMixin
+from src.table_modifier.classifier.check import BaseCheck, MatchCountCheckMixin
 
 
 class LengthVarianceCheck(BaseCheck[str], MatchCountCheckMixin[str]):
