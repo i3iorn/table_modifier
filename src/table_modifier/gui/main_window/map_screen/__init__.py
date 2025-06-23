@@ -13,15 +13,15 @@ from PyQt6.QtWidgets import (
     QScrollArea,
 )
 
-from table_modifier.classifier import ColumnTypeClassifier, DetectorRegistry
-from table_modifier.config.state import state
-from table_modifier.constants import NO_MARGIN
-from table_modifier.file_interface.excel import ExcelFileInterface
-from table_modifier.file_interface.factory import FileInterfaceFactory
-from table_modifier.gui.main_window.map_screen.draggable_label import DraggableLabel
-from table_modifier.gui.main_window.map_screen.drop_slot import DropSlot
-from table_modifier.localizer import String
-from table_modifier.signals import ON
+from src.table_modifier.classifier import ColumnTypeClassifier, DetectorRegistry
+from src.table_modifier.config.state import state
+from src.table_modifier.constants import NO_MARGIN
+from src.table_modifier.file_interface.excel import ExcelFileInterface
+from src.table_modifier.file_interface.factory import FileInterfaceFactory
+from src.table_modifier.gui.main_window.map_screen.draggable_label import DraggableLabel
+from src.table_modifier.gui.main_window.map_screen.drop_slot import DropSlot
+from src.table_modifier.localization import String
+from src.table_modifier.signals import ON
 
 
 class MapScreen(QWidget):

@@ -2,7 +2,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
 from PyQt6.QtWidgets import QLabel, QFrame
 
-from table_modifier.signals import EMIT, ON
+from src.table_modifier.signals import EMIT, ON
 
 
 class DropSlot(QLabel):

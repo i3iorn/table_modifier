@@ -4,10 +4,10 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QSpacerItem, QSizePolicy, QWidget, \
     QLabel
 
-from table_modifier.gui.main_window.file_selector import FileSelectorWidget
-from table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
-from table_modifier.localizer import String
-from table_modifier.signals import EMIT
+from src.table_modifier.gui.main_window.file_selector import FileSelectorWidget
+from src.table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
+from src.table_modifier.localization import String
+from src.table_modifier.signals import EMIT
 
 
 class InputScreen(QWidget):

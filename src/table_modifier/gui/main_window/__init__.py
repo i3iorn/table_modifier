@@ -1,12 +1,12 @@
 from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QTabWidget
 
-from table_modifier.config.state import state
-from table_modifier.gui.main_window.config_screen import ConfigScreen
-from table_modifier.gui.main_window.file_selector import FileSelectorWidget
-from table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
-from table_modifier.gui.main_window.input_screen import InputScreen
-from table_modifier.gui.main_window.map_screen import MapScreen
-from table_modifier.signals import ON
+from src.table_modifier.config.state import state
+from src.table_modifier.gui.main_window.config_screen import ConfigScreen
+from src.table_modifier.gui.main_window.file_selector import FileSelectorWidget
+from src.table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
+from src.table_modifier.gui.main_window.input_screen import InputScreen
+from src.table_modifier.gui.main_window.map_screen import MapScreen
+from src.table_modifier.signals import ON
 
 
 class MainWindow(QMainWindow):

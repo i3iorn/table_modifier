@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton
 )
 
-from table_modifier.signals import EMIT
+from src.table_modifier.signals import EMIT
 
 
 class FolderSelectorWidget(QWidget):

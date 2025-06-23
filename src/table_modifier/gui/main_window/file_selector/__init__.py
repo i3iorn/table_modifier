@@ -3,9 +3,9 @@ import logging
 from PyQt6.QtCore import Qt, QModelIndex
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListView, QHBoxLayout
 
-from table_modifier.config.state import state
-from table_modifier.gui.main_window.file_selector.models import FileModel
-from table_modifier.signals import ON
+from src.table_modifier.config.state import state
+from src.table_modifier.gui.main_window.file_selector.models import FileModel
+from src.table_modifier.signals import ON
 
 
 class FileSelectorWidget(QWidget):

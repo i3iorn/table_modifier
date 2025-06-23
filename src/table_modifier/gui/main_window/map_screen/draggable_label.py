@@ -2,7 +2,7 @@ from PyQt6.QtCore import Qt, QMimeData
 from PyQt6.QtGui import QMouseEvent, QDrag, QPixmap
 from PyQt6.QtWidgets import QLabel, QFrame
 
-from table_modifier.signals import ON, EMIT
+from src.table_modifier.signals import ON, EMIT
 
 
 class DraggableLabel(QLabel):

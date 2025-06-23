@@ -2,8 +2,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QComboBox, QHBoxLayout, \
     QSpacerItem, QSizePolicy
 
-from table_modifier.config import controls
-from table_modifier.localizer import String
+from src.table_modifier.config import controls
+from src.table_modifier.localization import String
 
 
 class ConfigScreen(QWidget):
