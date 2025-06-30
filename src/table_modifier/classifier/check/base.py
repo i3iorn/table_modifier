@@ -1,4 +1,5 @@
 # table_modifier/checks/base.py
+import logging
 from abc import ABC, abstractmethod
 from typing import Generic, List, TypeVar, Callable, Optional
 
@@ -28,6 +29,8 @@ class BaseCheck(AbstractCheck[T]):
         self._name = name
         self._weight = weight
         self._description = description or ""
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def name(self) -> str:
         return self._name
     def weight(self) -> float:
@@ -35,4 +38,5 @@ class BaseCheck(AbstractCheck[T]):
     def is_applicable(self, values: List[T]) -> bool:
         return bool(values)
     def run(self, values: List[T]) -> float:
+        self.logger.debug(f"Running check '{self._name}' with weight {self._weight} on values: {values[:5]}")
         return self._func(values) * self._weight

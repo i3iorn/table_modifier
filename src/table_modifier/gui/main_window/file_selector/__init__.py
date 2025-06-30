@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListView, QHBoxLayout
 
 from src.table_modifier.config.state import state
 from src.table_modifier.gui.main_window.file_selector.models import FileModel
-from src.table_modifier.signals import ON
+from src.table_modifier.signals import ON, EMIT
 
 
 class FileSelectorWidget(QWidget):

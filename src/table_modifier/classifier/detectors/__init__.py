@@ -1,6 +1,9 @@
 from .boolean import BooleanDetector
 from .numeric import (
-    NumericDetector, DunsDetector, NumericalCategoryDetector, ZipCodeDetector
+    NumericDetector, DunsDetector, NumericalCategoryDetector, ZipCodeDetector,
+    SwedishRegistrationNumberDetector, NorwegianRegistrationNumberDetector,
+    FinnishRegistrationNumberDetector, DanishRegistrationNumberDetector,
+    NordicRegistrationNumberDetector, PhoneNumberDetector
 )
 from .text import (
     TextDetector, NameDetector, CompanyNameDetector, CountryNameDetector,
@@ -20,5 +23,11 @@ __all__ = [
     "CountryNameDetector",
     "CountryCodeDetector",
     "CurrencyCodeDetector",
-    "TextCategoryDetector"
+    "TextCategoryDetector",
+    "SwedishRegistrationNumberDetector",
+    "NorwegianRegistrationNumberDetector",
+    "FinnishRegistrationNumberDetector",
+    "DanishRegistrationNumberDetector",
+    "NordicRegistrationNumberDetector",
+    "PhoneNumberDetector"
 ]

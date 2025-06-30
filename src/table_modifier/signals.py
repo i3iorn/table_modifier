@@ -18,7 +18,7 @@ class EventBus:
         self._wildcard_map: Dict[str, List[Callable]] = defaultdict(list)
         self._lock = threading.RLock()
         self._last_emit_time: Dict[str, float] = {}
-        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self._logger = logging.getLogger(self.__class__.__name__)
 
     def _get_signal(self, name: str) -> Signal:
         with self._lock:
@@ -59,6 +59,8 @@ class EventBus:
                 handler(sender, signal=name, **kwargs)
             except Exception as e:
                 self._logger.error(f"Error in wildcard handler for '{name}': {e}", exc_info=True)
+
+        self._logger.debug(f"[EventBus] Handlers for '{name}' emitted successfully.")
 
     def on(self, name: str, handler: Callable) -> None:
         """
@@ -131,13 +133,49 @@ class EventBus:
 _event_bus = EventBus()
 
 def EMIT(name: str, **kwargs) -> None:
-    """Emit a signal globally with automatic sender detection."""
+    """
+    Emit a signal globally.
+
+    This function allows you to emit a signal with a specific name and optional keyword
+    arguments. It uses the global event bus instance to handle the emission.
+
+    Args:
+        name (str): The name of the signal to emit.
+        **kwargs (**Any): Additional keyword arguments to pass with the signal.
+
+    Returns:
+        None
+    """
     _event_bus.emit(name, **kwargs)
 
 def ON(name: str, handler: Callable) -> None:
-    """Subscribe to a signal globally."""
+    """
+    Subscribe a handler globally to a signal.
+
+    This function allows you to register a handler for a specific signal name. The handler
+    will be called whenever the signal is emitted.
+
+    Args:
+        name (str): The name of the signal to subscribe to.
+        handler (Callable): The handler function to call when the signal is emitted.
+
+    Returns:
+        None
+    """
     _event_bus.on(name, handler)
 
 def OFF(name: str, handler: Callable) -> None:
-    """Unsubscribe a handler globally."""
+    """
+    Unsubscribe a handler globally from a signal.
+
+    This function allows you to remove a previously registered handler for a specific
+    signal name. The handler will no longer be called when the signal is emitted.
+
+    Args:
+        name (str): The name of the signal to unsubscribe from.
+        handler (Callable): The handler function to remove.
+
+    Returns:
+        None
+    """
     _event_bus.off(name, handler)

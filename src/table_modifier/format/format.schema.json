@@ -1,0 +1,50 @@
+{
+  "@id": "https://github.com/i3iorn/table_modifier/src/table_modifier/format/format.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Table Modifier Format Schema",
+  "description": "Schema for the table modifier format used in the Table Modifier application.",
+  "type": "object",
+  "properties": {
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "examples": ["header", "body", "footer"]
+      }
+    },
+    "file_interface": {
+      "type": "string",
+      "description": "The file interface used for the table modifier format."
+    },
+    "header": {
+      "type": "array",
+      "description": "Rows for the header component, each row is an array of strings.",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "examples": [["Column1", "Column2", "Column3"]]
+      }
+    },
+    "footer": {
+      "type": "array",
+      "description": "Rows for the footer component, each row is an array of strings.",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "examples": [["Footer1", "Footer2"], "Total: 100"]
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for the format (e.g., encoding, version).",
+      "additionalProperties": true,
+      "examples": [{"encoding": "utf-8", "version": "1.0"}]
+    }
+  },
+  "required": ["components", "file_interface", "metadata"],
+  "additionalProperties": true
+}

@@ -40,3 +40,62 @@ class ZipCodeDetector(NumericDetector):
         self.add_check(PatternCheck(r"^\d{5}$", weight=1.2, name="zip_code_5_digit_check"))
         self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
         self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+
+class PhoneNumberDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(
+            r"^(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{4}$",
+            name="phone_number_check", weight=0.75))
+        self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+
+class NordicRegistrationNumberDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(
+            r"^(?:\d{7}-\d|\d{8}|\d{9}|\d{10}|(16|[2-9]\d)\d{6}-?\d{4})$",
+            name="nordic_registration_number_check", weight=0.5)
+        )
+        self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+
+class SwedishRegistrationNumberDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(
+            r"^(16)?\d{6}(-)?\d{4}$", name="swedish_registration_number_check"))
+        self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+
+class NorwegianRegistrationNumberDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(
+            r"^\d{9}$", name="norwegian_registration_number_check", weight=0.75))
+        self.add_check(LengthVarianceCheck(max_variance=0.1, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+
+class FinnishRegistrationNumberDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(
+            r"^\d{7}-\d$", name="finnish_registration_number_check"))
+        self.add_check(LengthVarianceCheck(max_variance=0.01, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+
+class DanishRegistrationNumberDetector(NumericDetector):
+    def __init__(self):
+        super().__init__()
+        self.add_check(PatternCheck(
+            r"^\d{8}$", name="danish_registration_number_check", weight=0.75))
+        self.add_check(LengthVarianceCheck(max_variance=0.01, weight=1.1))
+        self.add_check(UniquenessCheck(min_uniqueness=0.8))
+
+

@@ -28,8 +28,18 @@ class MainWindow(QMainWindow):
         cw.addTab(InputScreen(self), "Input Screen")
         cw.addTab(ConfigScreen(self), "Configuration")
         cw.addTab(MapScreen(self), "Map Columns")
+        cw.setTabEnabled(2, False)  # Disable Map Columns tab initially
+
+        ON("state.file.tracked_files.file.count", self.map_screen_enabled)
 
         self.init_menu_bar()
+
+    def map_screen_enabled(self, sender, count: int, **kwargs):
+        """Enable the screen if there are tracked files."""
+        if count > 0:
+            self.centralWidget().setTabEnabled(2, True)
+        else:
+            self.centralWidget().setTabEnabled(2, False)
 
     def init_menu_bar(self):
         self.menuBar().setNativeMenuBar(False)

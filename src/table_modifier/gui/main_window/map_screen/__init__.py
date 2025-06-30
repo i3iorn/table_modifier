@@ -27,7 +27,7 @@ from src.table_modifier.signals import ON
 class MapScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.skip_rows_input = None
         self.drop_slots = []
 

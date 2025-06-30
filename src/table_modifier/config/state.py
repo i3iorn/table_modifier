@@ -19,7 +19,7 @@ class FileList:
         super().__init__()
         self._name = name
         self._lock: Lock = Lock()
-        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self._logger = logging.getLogger(self.__class__.__name__)
         self._files: Dict[FileInterfaceProtocol, FileStatus] = {}
 
     def all(self) -> List[FileInterfaceProtocol]:
@@ -50,6 +50,11 @@ class FileList:
 
         self._logger.debug(f"{action.title()}{' existing' if action == 'updated' else ''} file {file_interface} status to {status}")
         EMIT(f"state.file.{self._name}.{action}", file=file_interface, status=status)
+        self.emit_file_count()
+
+    def emit_file_count(self) -> None:
+        """ Emit the current count of files in the list. """
+        EMIT(f"state.file.{self._name}.file.count", count=len(self._files))
 
     def __setitem__(self, file_path: FilePath, status: FileStatus) -> None:
         """
@@ -90,6 +95,7 @@ class FileList:
                 raise KeyError(f"File {file_interface} not found in FileList")
             del self._files[file_interface]
         EMIT(f"state.file.{self._name}.deleted", file=file_interface)
+        self.emit_file_count()
 
     def clear(self) -> None:
         """
@@ -98,7 +104,7 @@ class FileList:
         with self._lock:
             self._files.clear()
         EMIT(f"file.{self._name}.cleared")
-        self._logger.debug("FileList cleared")
+        self.emit_file_count()
 
     def __contains__(self, file_path: FilePath) -> bool:
         """
@@ -148,7 +154,24 @@ class State:
         self.container: Container = Container()
         self.tracked_files: FileList = FileList("tracked_files")
         self._controls: Dict[str, any] = {}
-        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self._logger = logging.getLogger(self.__class__.__name__)
+
+    def add_control(self, name_id: str, value: Any = None):
+        """
+        Add a control to the state.
+
+        Args:
+            name_id (str): The identifier for the control.
+            value (Any): The initial value for the control.
+        """
+        with self._controls_lock:
+            if name_id in self._controls:
+                self._logger.warning(f"Control '{name_id}' already exists; updating its value.")
+                self.update_control(name_id, value)
+            else:
+                self._controls[name_id] = value
+                EMIT(f"control.{name_id}.added", control=name_id, value=value)
+        self._logger.debug(f"Control '{name_id}' added with value: {value}")
 
     @property
     def controls(self) -> Dict[str, any]:

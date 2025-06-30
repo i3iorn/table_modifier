@@ -9,12 +9,9 @@ class BooleanDetector(Detector):
             BaseCheck(
                 func=lambda vals: MatchCountCheckMixin().by_predicate(
                     vals,
-                    lambda v: isinstance(v, bool)
-                              or (isinstance(v, str) and v.lower() in {"true","false","yes","no"})
-                              or (isinstance(v, (int)) and v in {0,1})
+                    lambda v: str(v).lower() in {"true", "false", "1", "0", "yes", "no"}
                 ),
-                name="boolean_check",
-                weight=1.0
+                name="boolean_check"
             )
         ])
         self._example_values = ["True", "False", "1", "0", "yes", "no"]

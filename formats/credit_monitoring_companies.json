@@ -1,0 +1,20 @@
+{
+  "components": [
+    "header",
+    "body"
+  ],
+  "header": [
+    "company", "RegistrationNumber", "CountryCode", "referenceNumber", "category"
+  ],
+  "body": [
+    {"columnType": "companyName"},
+    {"columnType": "registrationNumber"},
+    {"columnType": "countryCode"},
+    {"columnType": "referenceNumber"},
+    {"columnType": "category"}
+  ],
+  "metadata": {
+    "encoding": "utf-8"
+  },
+  "file_interface": "excel"
+}

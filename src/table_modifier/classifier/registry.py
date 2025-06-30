@@ -3,7 +3,7 @@ from threading import RLock
 from typing import Dict, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.table_modifier.classifier.detector import Detector
+    from src.table_modifier.classifier.detectors.base import Detector
 
 
 class DetectorRegistry:

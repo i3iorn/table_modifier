@@ -2,13 +2,14 @@ from .setup import ROOT_PATH
 from PyQt6.QtWidgets import QComboBox
 
 controls = {
-    "general_options":{
-        "log_level": {
+    "general_options":[
+        {
+            "name": "log_level",
             "class": QComboBox,
             "label": "Log Level",
             "items": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         },
-    },
+    ],
     "process_options":
     {
         "kund_id_1": {
