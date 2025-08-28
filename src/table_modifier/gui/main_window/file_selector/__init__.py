@@ -1,27 +1,25 @@
+"""File selection widget showing available and tracked files side by side."""
+
 import logging
+from typing import Optional
 
 from PyQt6.QtCore import Qt, QModelIndex
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListView, QHBoxLayout
 
 from src.table_modifier.config.state import state
 from src.table_modifier.gui.main_window.file_selector.models import FileModel
-from src.table_modifier.signals import ON, EMIT
+from src.table_modifier.localization import String
 
 
 class FileSelectorWidget(QWidget):
-    """
-    A widget for selecting a file from a list of files.
+    """Widget for selecting files from a directory and managing tracked files."""
 
-    The widget displays a list view of files available in the current directory that
-    can be handled by one of the file interface handlers. It allows the user to select
-    a file, which can then be processed by the application.
-    """
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.selected_files_view = None
-        self.selected_files_model = None
-        self.file_view: QListView = None
-        self.file_model: FileModel = None
+        self.selected_files_view: QListView
+        self.selected_files_model: FileModel
+        self.file_view: QListView
+        self.file_model: FileModel
         self.setLayout(QVBoxLayout(self))
         self.state = state
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -30,31 +28,27 @@ class FileSelectorWidget(QWidget):
         self.connect_signals()
 
     def init_ui(self) -> None:
-        """
-        Initialize the user interface components of the file selector widget.
-        This method sets up the layout and any necessary widgets for file selection.
-        """
-        label = QLabel("Select a file from the list below:")
+        """Initialize the UI and models/views."""
+        label = QLabel(String.get("FILE_SELECTOR_HINT", "Select a file from the list below:"))
         self.layout().addWidget(label)
 
         box_layout = QHBoxLayout(self)
 
         self.file_model = FileModel(self)
+        # Refresh available files when directory changes
+        from src.table_modifier.signals import ON  # local import to avoid cycles at import time
         ON("directory.updated", self.file_model.update_files_from_folder_path)
 
         self.file_view = QListView(self)
         self.file_view.setModel(self.file_model)
-        self.file_view.setSelectionMode(
-            QListView.SelectionMode.SingleSelection
-        )
+        self.file_view.setSelectionMode(QListView.SelectionMode.SingleSelection)
 
         self.selected_files_model = FileModel(self, "tracked_files")
         self.selected_files_view = QListView(self)
         self.selected_files_view.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
         self.selected_files_view.setModel(self.selected_files_model)
-        self.selected_files_view.setSelectionMode(
-            QListView.SelectionMode.SingleSelection
-        )
+        self.selected_files_view.setSelectionMode(QListView.SelectionMode.SingleSelection)
+
         ON("state.file.tracked_files.*", self.selected_files_model.update)
 
         box_layout.addWidget(self.file_view, 2)
@@ -63,19 +57,12 @@ class FileSelectorWidget(QWidget):
         self.layout().addLayout(box_layout)
 
     def connect_signals(self) -> None:
-        """
-        Connect signals to handle user interactions with the file selector widget.
-        """
+        """Connect interactions for both lists."""
         self.file_view.doubleClicked.connect(self.on_file_double_clicked)
         self.selected_files_view.doubleClicked.connect(self.on_selected_files_double_clicked)
 
     def on_file_double_clicked(self, index: QModelIndex) -> None:
-        """
-        Handle the double-click event on a file in the list view.
-
-        This method retrieves the file path from the clicked index and emits a signal
-        to update the selected files in the application state.
-        """
+        """Add a file to tracked files when double-clicked on the available list."""
         if not index.isValid():
             return
 
@@ -87,15 +74,10 @@ class FileSelectorWidget(QWidget):
         if file_path not in self.state.tracked_files:
             state.tracked_files.append(file_path)
         else:
-            self.logger.info(f"File {file_path} is already selected.")
+            self.logger.info("File %s is already selected.", file_path)
 
     def on_selected_files_double_clicked(self, index: QModelIndex) -> None:
-        """
-        Handle the double-click event on a selected file in the list view.
-
-        This method retrieves the file path from the clicked index and emits a signal
-        to remove the file from the selected files in the application state.
-        """
+        """Remove a tracked file when double-clicked in the tracked list."""
         if not index.isValid():
             return
 
@@ -107,4 +89,4 @@ class FileSelectorWidget(QWidget):
         if file_path in self.state.tracked_files:
             del self.state.tracked_files[file_path]
         else:
-            self.logger.warning(f"File {file_path} is not in the tracked files.")
+            self.logger.warning("File %s is not in the tracked files.", file_path)

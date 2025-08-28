@@ -1,10 +1,7 @@
 import threading
-from typing import Type, List, Dict, Any, TYPE_CHECKING
+from typing import Type, List, Dict, Any
 
 from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
-
-if TYPE_CHECKING:
-    from src.table_modifier.file_interface.utils import FilePath
 
 
 class FileInterfaceFactory:
@@ -12,12 +9,13 @@ class FileInterfaceFactory:
     Holds a registry of handlers; new formats can register themselves
     by subclassing FileInterfaceProtocol and appending to ._handlers.
     """
+
     _handlers: list[Type[FileInterfaceProtocol]] = []
     _handler_lock: threading.Lock = threading.Lock()
 
     @classmethod
-    def register(cls, handler: Type[FileInterfaceProtocol]) -> None:
-        cls._handlers.append(handler)
+    def register(cls, handler: type) -> None:
+        cls._handlers.append(handler)  # type: ignore[list-item]
 
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
@@ -37,32 +35,21 @@ class FileInterfaceFactory:
         raise ValueError(f"No handler for {file_path!r}")
 
 
-def load(file_path: str) -> FileInterfaceProtocol:
+def load(file_path: "FilePath") -> FileInterfaceProtocol:
     """
-    Load a file interface for the given file path.
-
-    Args:
-        file_path (str): The path to the file.
-
-    Returns:
-        FileInterfaceProtocol: An instance of a file interface that can handle the file.
-
-    Raises:
-        ValueError: If no handler can handle the given file path.
+    Load or return a file interface for the given file path or interface.
     """
-    return FileInterfaceFactory.create(file_path)
+    if isinstance(file_path, FileInterfaceProtocol):  # type: ignore[arg-type]
+        return file_path
+    return FileInterfaceFactory.create(str(file_path))
 
 
 def save(file_path: "FilePath", data: List[Dict[str, Any]]) -> None:
     """
-    Save data to a file using the appropriate file interface.
+    Save data (list of dicts) to a file using the appropriate file interface.
 
-    Args:
-        file_path (FilePath): The path to the file or FileInterface.
-        data (List[Dict[str, Any]]): The data to save.
-
-    Raises:
-        ValueError: If no handler can handle the given file path.
+    - If file_path is an interface, it will be used directly.
+    - Otherwise, a handler will be selected based on the path extension.
     """
     file_interface = load(file_path)
     file_interface.append_list(data)

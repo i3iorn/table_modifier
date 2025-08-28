@@ -1,23 +1,25 @@
 import os
-from typing import Iterator, Dict, Any, Optional
+from pathlib import Path
+from typing import Iterator, Dict, Any, Optional, List
 import pandas as pd
 
+from .base import BaseInterface
 from .utils import FilePath
 from .factory import FileInterfaceFactory
-from .protocol import FileInterfaceProtocol
 
 
-class ExcelFileInterface(FileInterfaceProtocol):
+class ExcelFileInterface(BaseInterface):
     file_type = "excel"
 
-    def __init__(self, file_path: Optional[FilePath] = None, sheet_name: Optional[str] = None):
+    def __init__(self, file_path: FilePath, sheet_name: Optional[str] = None):
         """
         :param file_path: path to the .xls/.xlsx file
         :param sheet_name: name or index of sheet to operate on; defaults to first sheet
         """
-        self.path = file_path
-        self.sheet_name = sheet_name
+        self.path = Path(file_path)
+        self.sheet_name: Optional[str] = sheet_name
         self._df: Optional[pd.DataFrame] = None
+        self._skip_rows: int = 0
 
     def get_headers(self, sheet_name: str = None) -> Optional[list[str]]:
         """
@@ -25,15 +27,13 @@ class ExcelFileInterface(FileInterfaceProtocol):
         If no header is present, returns None.
         """
         self._ensure_sheet()
-        if sheet_name is None:
-            sheet_name = self.sheet_name or pd.ExcelFile(self.path).sheet_names[0]
-        skip_rows = self._skip_rows if hasattr(self, '_skip_rows') else 0
-        df = pd.read_excel(self.path, sheet_name=sheet_name, nrows=0, skiprows=skip_rows)
+        sheet: int | str = sheet_name or self.sheet_name or 0
+        df = pd.read_excel(self.path, sheet_name=sheet, nrows=0, skiprows=self._skip_rows)
         return list(df.columns)
 
     @classmethod
     def can_handle(cls, file_path: str) -> bool:
-        ext = os.path.splitext(file_path)[1].lower()
+        ext = os.path.splitext(str(file_path))[1].lower()
         return ext in (".xls", ".xlsx")
 
     def _ensure_sheet(self) -> None:
@@ -43,22 +43,15 @@ class ExcelFileInterface(FileInterfaceProtocol):
             self.sheet_name = xls.sheet_names[0]
 
     def append_df(self, df: pd.DataFrame) -> None:
-        if self._df is None:
-            self.load()
-        if self.sheet_name not in self._df.columns:
-            raise ValueError(f"Sheet '{self.sheet_name}' does not exist in the loaded DataFrame")
-        # Append to existing DataFrame
-        self._df = pd.concat([self._df, df], ignore_index=True)
+        # Ensure loaded DataFrame for the active sheet
+        base = self._df if self._df is not None else self.load()
+        self._df = pd.concat([base, df], ignore_index=True)
 
-    def append_list(self, data: list[Dict[str, Any]]) -> None:
-        if self._df is None:
-            self.load()
-        if self.sheet_name not in self._df.columns:
-            raise ValueError(f"Sheet '{self.sheet_name}' does not exist in the loaded DataFrame")
-        # Convert list of dicts to DataFrame and append
+    def append_list(self, data: List[Dict[str, Any]]) -> None:
         new_df = pd.DataFrame(data)
-        self._df = pd.concat([self._df, new_df], ignore_index=True)
+        self.append_df(new_df)
 
+    @property
     def encoding(self) -> str:
         # Excel files don't have a text encoding like CSV
         return "utf-8"
@@ -66,7 +59,9 @@ class ExcelFileInterface(FileInterfaceProtocol):
     def load(self) -> pd.DataFrame:
         # Eager read entire sheet
         self._ensure_sheet()
-        self._df = pd.read_excel(self.path, sheet_name=self.sheet_name)
+        sheet: int | str = self.sheet_name or 0
+        df = pd.read_excel(self.path, sheet_name=sheet, skiprows=self._skip_rows)
+        self._df = df
         return self._df
 
     def iter_load(self, chunksize: int = 1_000) -> Iterator[pd.DataFrame]:
@@ -80,7 +75,6 @@ class ExcelFileInterface(FileInterfaceProtocol):
         Iterate over columns in chunks.
         If value_count is specified, yield only that many values per column.
         """
-        self._ensure_sheet()
         df = self._df if self._df is not None else self.load()
         for col in df.columns:
             col_data = df[col]
@@ -99,26 +93,20 @@ class ExcelFileInterface(FileInterfaceProtocol):
     def save_as(self, file_path: str) -> None:
         if self._df is None:
             raise RuntimeError("No DataFrame loaded to save")
-        # Use ExcelWriter to preserve sheet_name
-        if self.path is None:
-            raise ValueError("File path must be set before saving")
-        else:
-            with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
-                # sheet_name is guaranteed by _ensure_sheet/load
-                self._df.to_excel(writer, sheet_name=self.sheet_name, index=False)
+        with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+            # sheet_name is guaranteed by _ensure_sheet/load
+            self._df.to_excel(writer, sheet_name=self.sheet_name or "Sheet1", index=False)
 
     def get_schema(self) -> Dict[str, str]:
         # Peek at first row if not already loaded
         if self._df is None:
-            self._ensure_sheet()
-            skip_rows = self._skip_rows if hasattr(self, '_skip_rows') else 0
-            df = pd.read_excel(self.path, sheet_name=self.sheet_name, skiprows=skip_rows, nrows=1)
+            sheet: int | str = self.sheet_name or 0
+            df = pd.read_excel(self.path, sheet_name=sheet, skiprows=self._skip_rows, nrows=1)
         else:
             df = self._df
         return {str(col): str(dtype) for col, dtype in df.dtypes.items()}
 
     def load_metadata(self) -> Dict[str, Any]:
-        # Must inspect sheet names & engine
         xls = pd.ExcelFile(self.path)
         return {
             "sheet_names": xls.sheet_names,
@@ -136,7 +124,6 @@ class ExcelFileInterface(FileInterfaceProtocol):
         """
         Return a list of sheet names in the Excel file.
         """
-        self._ensure_sheet()
         xls = pd.ExcelFile(self.path)
         return xls.sheet_names
 

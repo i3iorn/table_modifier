@@ -1,80 +1,68 @@
+"""List models for the FileSelector widget."""
+
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Any
 
-from PyQt6.QtCore import QAbstractListModel, Qt
+from PyQt6.QtCore import QAbstractListModel, Qt, QModelIndex
 
 from src.table_modifier.config.state import state
 from src.table_modifier.file_interface.factory import FileInterfaceFactory
-from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
 
 
 class FileModel(QAbstractListModel):
-    """
-    A model for managing a list of files in a QListView.
+    """Model representing either available files in a directory or tracked files.
 
-    This model is used to display a list of files that can be selected by the user.
-    It inherits from QAbstractListModel and provides methods to manage the file list.
+    - When state_name is None: lists files in the currently selected directory
+      that can be handled by any registered file handler.
+    - When state_name == "tracked_files": lists files added to state.tracked_files.
     """
-    def __init__(self, parent=None, state_name: Optional[str] = None):
+
+    def __init__(self, parent: Optional[Any] = None, state_name: Optional[str] = None):
         super().__init__(parent)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.state_name = state_name
         self.files: List[Path] = []
 
-    def data(self, index, role: int = Qt.ItemDataRole.DisplayRole):
-        """
-        Return the data for the given index and role.
-
-        :param index: The index of the item to retrieve.
-        :param role: The role of the data to retrieve.
-        :return: The file name if the role is DisplayRole, otherwise None.
-        """
-        if not index.isValid() or index.row() >= len(self.files):
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
+        """Return the data for the given index and role."""
+        if not index.isValid() or index.row() < 0 or index.row() >= len(self.files):
             return None
+        path = self.files[index.row()]
         if role == Qt.ItemDataRole.DisplayRole:
-            return self.files[index.row()].name
-        elif role == Qt.ItemDataRole.UserRole:
-            return self.files[index.row()]
+            return path.name
+        if role == Qt.ItemDataRole.UserRole:
+            return path
         return None
 
-    def update(self, sender, **kwargs):
-        """
-        Update the model with the current list of files.
-
-        This method is called to refresh the model's data.
-        It emits dataChanged signal to notify views about the update.
-        """
-        self.logger.debug("Updating file model with current files")
+    def update(self, sender: str, **kwargs):
+        """Refresh the model from state.tracked_files."""
+        self.logger.debug("Updating file model with current tracked files")
         self.beginResetModel()
         self.files = [f.path for f in state.tracked_files.all()]
         self.endResetModel()
-        self.logger.info(f"File model updated with {len(self.files)} files")
+        self.logger.info("File model updated with %d files", len(self.files))
 
-    def update_files_from_folder_path(self, sender, **kwargs):
-        """
-        Update the model with files from the specified folder path.
-
-        :param directory: The path to the folder from which to load files.
-        """
+    def update_files_from_folder_path(self, sender: str, **kwargs) -> None:
+        """Load files from provided directory that handlers can process."""
         directory = kwargs.get("directory")
-        self.logger.debug(f"Updating files from folder: {directory}")
+        if not directory:
+            return
+        self.logger.debug("Updating files from folder: %s", directory)
+        root = Path(directory)
         self.beginResetModel()
-        self.files = [
-            file
-            for file
-            in Path(directory).glob("*")
-            if file.is_file()
-               and FileInterfaceFactory.can_handle(file.as_posix())
-        ]
-        self.endResetModel()
-        self.logger.info(f"Loaded {len(self.files)} files from {directory}")
+        try:
+            self.files = [
+                file
+                for file in root.glob("*")
+                if file.is_file() and FileInterfaceFactory.can_handle(file.as_posix())
+            ]
+        finally:
+            self.endResetModel()
+        self.logger.info("Loaded %d files from %s", len(self.files), directory)
 
-    def rowCount(self, parent=None):
-        """
-        Return the number of rows in the model.
-
-        :param parent: Not used, required by QAbstractListModel.
-        :return: The number of files in the model.
-        """
+    def rowCount(self, parent: Optional[QModelIndex] = None) -> int:  # type: ignore[override]
+        """Return the number of rows in the model."""
         return len(self.files)

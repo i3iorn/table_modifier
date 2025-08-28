@@ -1,12 +1,12 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
+from PyQt6.QtCore import Qt, QMimeData
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QDrag, QPixmap
 from PyQt6.QtWidgets import QLabel, QFrame
 
-from src.table_modifier.signals import EMIT, ON
+from src.table_modifier.signals import EMIT
 
 
 class DropSlot(QLabel):
-    def __init__(self, index, parent=None):
+    def __init__(self, index: int, parent=None):
         super().__init__("", parent)
         self.index = index
         self.setAcceptDrops(True)
@@ -15,11 +15,13 @@ class DropSlot(QLabel):
         self.setFixedSize(200, 40)
         self.setWordWrap(True)
         self.has_content = False
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
         background: #f9f9f9;
-        """)
+        border: 2px solid #ccc; border-radius: 6px;
+        """
+        )
         self.update_style()
-        ON("header.map.double_click", self._on_doubleclick)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasText():
@@ -27,27 +29,41 @@ class DropSlot(QLabel):
 
     def dropEvent(self, event: QDropEvent):
         text = event.mimeData().text()
-        self._update_text(text)
+        self.set_text(text)
         event.acceptProposedAction()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        # Allow dragging this slot's content to reorder/move mappings
+        if event.button() == Qt.MouseButton.LeftButton and self.has_content:
+            drag = QDrag(self)
+            mime_data = QMimeData()
+            mime_data.setText(self.text())
+            drag.setMimeData(mime_data)
+            pixmap = QPixmap(self.size())
+            self.render(pixmap)
+            drag.setPixmap(pixmap)
+            drag.exec(Qt.DropAction.MoveAction)
+        else:
+            super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            self.deleteLater()
+            # Clear content on double click instead of deleting the slot widget
+            self.clear()
         event.accept()
 
     def is_empty(self) -> bool:
         return not self.has_content
 
-    def _on_doubleclick(self, sender, text: str, **kwargs):
-        if not self.has_content:
-            self._update_text(text)
-            return True
-        return False
+    # Public API for MapScreen
+    def clear(self) -> None:
+        self.set_text("")
 
-    def _update_text(self, text: str):
+    def set_text(self, text: str) -> None:
         self.setText(text)
         self.has_content = bool(text.strip())
         self.update_style()
+        # Notify about the change; MapScreen will dedupe, add slots if needed, and emit order-changed
         EMIT("header.map.drop", index=self.index, text=text)
 
     def update_style(self):

@@ -23,23 +23,12 @@ class FileList:
         self._files: Dict[FileInterfaceProtocol, FileStatus] = {}
 
     def all(self) -> List[FileInterfaceProtocol]:
-        """
-        Get all file paths in the list.
-
-        Returns:
-            List[FileInterfaceProtocol]: A list of all file paths.
-        """
+        """Return all file interfaces in the list."""
         with self._lock:
             return list(self._files.keys())
 
     def append(self, file_path: FilePath, status: FileStatus = FileStatus()) -> None:
-        """
-        Append a file to the list with its status.
-
-        Args:
-            file_path (FilePath): The file path to add.
-            status (FileStatus): The status of the file, default is PENDING.
-        """
+        """Append or update a file with status and emit signals accordingly."""
         file_interface = from_file_path(file_path)
         with self._lock:
             if file_interface in self._files:
@@ -48,34 +37,22 @@ class FileList:
                 action = "added"
             self._files[file_interface] = status
 
-        self._logger.debug(f"{action.title()}{' existing' if action == 'updated' else ''} file {file_interface} status to {status}")
+        self._logger.debug(
+            f"{action.title()}{' existing' if action == 'updated' else ''} file {file_interface} status to {status}"
+        )
         EMIT(f"state.file.{self._name}.{action}", file=file_interface, status=status)
         self.emit_file_count()
 
     def emit_file_count(self) -> None:
-        """ Emit the current count of files in the list. """
+        """Emit the current count of files in the list."""
         EMIT(f"state.file.{self._name}.file.count", count=len(self._files))
 
     def __setitem__(self, file_path: FilePath, status: FileStatus) -> None:
-        """
-        Set the status of a file in the list.
-
-        Args:
-            file_path (FilePath): The file path to set.
-            status (FileStatus): The status to set for the file.
-        """
+        """Set or update a file's status."""
         self.append(file_path, status)
 
     def __getitem__(self, file_path: FilePath) -> FileStatus:
-        """
-        Get the status of a file in the list.
-
-        Args:
-            file_path (FilePath): The file path to get the status for.
-
-        Returns:
-            FileStatus: The status of the file.
-        """
+        """Get the status of a specific file."""
         file_interface = from_file_path(file_path)
         with self._lock:
             if file_interface not in self._files:
@@ -83,12 +60,7 @@ class FileList:
             return self._files[file_interface]
 
     def __delitem__(self, file_path: FilePath) -> None:
-        """
-        Remove a file from the list.
-
-        Args:
-            file_path (FilePath): The file path to remove.
-        """
+        """Remove a file from the list and emit signals."""
         file_interface = from_file_path(file_path)
         with self._lock:
             if file_interface not in self._files:
@@ -98,46 +70,26 @@ class FileList:
         self.emit_file_count()
 
     def clear(self) -> None:
-        """
-        Clear the file list and emit a signal that the list has been cleared.
-        """
+        """Clear the file list and emit a signal that the list has been cleared."""
         with self._lock:
             self._files.clear()
-        EMIT(f"file.{self._name}.cleared")
+        EMIT(f"state.file.{self._name}.cleared")
         self.emit_file_count()
 
     def __contains__(self, file_path: FilePath) -> bool:
-        """
-        Check if a file is in the list.
-
-        Args:
-            file_path (FilePath): The file path to check.
-
-        Returns:
-            bool: True if the file is in the list, False otherwise.
-        """
+        """Return True if a file is in the list."""
         file_interface = from_file_path(file_path)
         with self._lock:
             return file_interface in self._files
 
     def __set__(self, instance, value):
-        """
-        Set the value of the file list. This method is not used in this context,
-        but it is defined to avoid AttributeError when accessing the property.
-        """
         raise AttributeError("FileList is read-only; use __setitem__ to add files.")
 
     def __len__(self):
-        """
-        Get the number of files in the list.
-        """
         with self._lock:
             return len(self._files)
 
     def __iter__(self):
-        """
-        Iterate over the file paths in the list.
-        """
         with self._lock:
             files = list(self._files.keys()).copy()
         return iter(files)
@@ -153,20 +105,16 @@ class State:
     def __init__(self):
         self.container: Container = Container()
         self.tracked_files: FileList = FileList("tracked_files")
-        self._controls: Dict[str, any] = {}
+        self._controls: Dict[str, Any] = {}
         self._logger = logging.getLogger(self.__class__.__name__)
 
     def add_control(self, name_id: str, value: Any = None):
-        """
-        Add a control to the state.
-
-        Args:
-            name_id (str): The identifier for the control.
-            value (Any): The initial value for the control.
-        """
+        """Add a control with an initial value; emits a 'control.added' event."""
         with self._controls_lock:
             if name_id in self._controls:
-                self._logger.warning(f"Control '{name_id}' already exists; updating its value.")
+                self._logger.warning(
+                    f"Control '{name_id}' already exists; updating its value."
+                )
                 self.update_control(name_id, value)
             else:
                 self._controls[name_id] = value
@@ -174,33 +122,25 @@ class State:
         self._logger.debug(f"Control '{name_id}' added with value: {value}")
 
     @property
-    def controls(self) -> Dict[str, any]:
-        """
-        Get the current controls state.
-        """
+    def controls(self) -> Dict[str, Any]:
+        """Return a copy of current controls state."""
         with self._controls_lock:
             return self._controls.copy()
 
     def maybe_store(self):
-        """
-        Store the current state of the application if needed.
-        This is a placeholder for any state persistence logic.
-        """
+        """Placeholder for persisting state to disk or config."""
         self._logger.warning("State is not stored; implement storage logic if needed.")
-        pass
 
-    def update_control(self, name_id, new_value: Any = None):
-        """
-        Update a control value in the state.
-
-        Args:
-            name_id (str): The identifier for the control.
-            new_value (Any): The new value to set for the control.
-        """
+    def update_control(self, name_id: str, new_value: Any = None):
+        """Update a control value and emit an 'updated' event."""
         with self._controls_lock:
             self._controls[name_id] = new_value
             EMIT(f"control.{name_id}.updated", control=name_id, new_value=new_value)
         self._logger.debug(f"Control '{name_id}' updated to: {new_value}")
+
+    def __setitem__(self, name_id: str, value: Any) -> None:
+        """Dict-like assignment for controls, delegates to update_control."""
+        self.update_control(name_id, value)
 
 
 state = State()

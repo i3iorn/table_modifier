@@ -1,12 +1,20 @@
-from loghelpers import log_calls
 from typing import Optional
+
+# Provide a no-op fallback if loghelpers is not available at runtime
+try:
+    from loghelpers import log_calls as _log_calls  # type: ignore
+except Exception:  # pragma: no cover - fallback
+    def _log_calls(*args, **kwargs):
+        def _decorator(fn):
+            return fn
+        return _decorator
 
 # half‑saturation constant a, solved from 2 / (2 + a) = 0.9
 _A = 2 * (1 - 0.9) / 0.9
 
 
-@log_calls()
-def normalize_numeral(x: float | int, __half_saturation_constant: Optional[float] = None) -> float:
+@_log_calls()
+def normalize_numeral(x: float | int, half_saturation_constant: Optional[float] = None) -> float:
     """
     Normalize x to [0.0, 1.0), never reaching 1.0 but approaching it.
 
@@ -15,15 +23,15 @@ def normalize_numeral(x: float | int, __half_saturation_constant: Optional[float
     - normalize(x→∞) → 1.0
 
     Args:
-        __half_saturation_constant: Optional half-saturation constant, defaults to _A.
-            If provided, it overrides the default value.
+        half_saturation_constant: Optional constant overriding the default _A.
         x: A non‑negative value to normalize.
     Returns:
         A float in [0.0, 1.0).
     """
     if x <= 0:
         return 0.0
-    return x / (x + _A)
+    a = _A if half_saturation_constant is None else float(half_saturation_constant)
+    return float(x) / (float(x) + a)
 
 
 def normalize_alpha(x: str) -> str:
@@ -35,7 +43,7 @@ def normalize_alpha(x: str) -> str:
     Returns:
         A normalized string in lowercase with leading/trailing whitespace removed.
     """
-    return x.strip() if x else ""
+    return x.lower().strip() if x else ""
 
 
 def normalize_numeral_list(values: list[float | int]) -> list[float]:
