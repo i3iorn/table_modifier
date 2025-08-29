@@ -1,0 +1,39 @@
+/* Common styles shared by all themes */
+
+/* Titles */
+QLabel#screenTitle {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+/* Drag source labels */
+QLabel#draggableLabel {
+  padding: 6px;
+  border: 2px solid;
+  border-radius: 6px;
+  min-width: 200px;
+  min-height: 40px;
+  qproperty-wordWrap: true;
+  qproperty-alignment: AlignCenter;
+}
+QLabel#draggableLabel[mapped="true"] {
+  /* border-color themed */
+}
+QLabel#draggableLabel[dragging="true"] {
+  /* border-color themed */
+}
+
+/* Drop slot container */
+QWidget#dropSlot {
+  border: 2px solid;
+  border-radius: 6px;
+  padding: 6px;
+}
+QWidget#dropSlot[filled="true"] {
+  /* border/background themed */
+}
+
+/* General tweaks */
+QScrollArea { border: none; }
+
