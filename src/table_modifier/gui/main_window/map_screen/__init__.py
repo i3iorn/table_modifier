@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -22,7 +22,7 @@ from src.table_modifier.file_interface.factory import FileInterfaceFactory
 from src.table_modifier.gui.main_window.map_screen.draggable_label import DraggableLabel
 from src.table_modifier.gui.main_window.map_screen.drop_slot import DropSlot
 from src.table_modifier.localization import String
-from src.table_modifier.signals import ON, EMIT, OFF
+from src.table_modifier.signals import ON, EMIT
 from src.table_modifier.gui.main_window.map_screen.utils import is_valid_skip_rows, parse_skip_rows
 
 
@@ -50,6 +50,8 @@ class MapScreen(QWidget):
         self._init_layout()
         self._init_controls()
         self.layout().addWidget(self.map_widget)
+        # Footer buttons at the bottom of the tab
+        self._init_footer()
 
     def _init_layout(self):
         main_layout = QVBoxLayout(self)
@@ -58,7 +60,7 @@ class MapScreen(QWidget):
         # Title
         title = QLabel(String["MAP_SCREEN_TITLE"], self)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
+        title.setObjectName("screenTitle")
         main_layout.addWidget(title)
 
     def _init_controls(self):
@@ -76,6 +78,19 @@ class MapScreen(QWidget):
         view.setMaximumHeight(8 * 20)
         view.clicked.connect(self._on_item_clicked)
         layout.addWidget(view)
+
+    def _init_footer(self):
+        footer = QHBoxLayout()
+        footer.addStretch(1)
+        # Clear all button moved to footer
+        clear_btn = QPushButton(String["MAP_CLEAR_ALL"], self)
+        clear_btn.clicked.connect(self._clear_all_slots)
+        footer.addWidget(clear_btn)
+        # Single Process button replaces Next/Done/Complete
+        process_btn = QPushButton(String.get("MAP_PROCESS", "Process"), self)
+        process_btn.clicked.connect(self._on_ready_to_process)
+        footer.addWidget(process_btn)
+        self.layout().addLayout(footer)
 
     def _drop_slots_available(self) -> bool:
         """Check if there are any available drop slots."""
@@ -143,8 +158,10 @@ class MapScreen(QWidget):
         self._unsubs.append(ON("header.map.double_click", self._on_header_double_click))
 
         # Restore previously saved mapping and skip rows if available
-        saved = state.controls.get("map.order.by_source", {}).get(self.current_source_id)
-        if saved:
+        saved_struct = state.controls.get("map.mapping.by_source", {}).get(self.current_source_id)
+        saved_legacy = state.controls.get("map.order.by_source", {}).get(self.current_source_id)
+        saved = saved_struct if saved_struct is not None else saved_legacy
+        if saved is not None:
             self._apply_saved_order(saved)
         saved_skip = state.controls.get("map.skip_rows.by_source", {}).get(self.current_source_id)
         if saved_skip is not None:
@@ -199,7 +216,8 @@ class MapScreen(QWidget):
 
         for header in headers:
             label = DraggableLabel(header)
-            label.setObjectName(f"header_label::{header}")
+            # Keep QSS objectName set by DraggableLabel; attach header via property instead
+            label.setProperty("header_label", header)
             self.left_labels.append(label)
             left_layout.addWidget(label)
 
@@ -215,19 +233,7 @@ class MapScreen(QWidget):
             right_container)  # Store for drop slot addition
         self.right_layout.addWidget(QLabel(String["MAP_TARGET_ORDER"]))
 
-        # Clear all button
-        clear_btn = QPushButton(String["MAP_CLEAR_ALL"])
-        clear_btn.clicked.connect(self._clear_all_slots)
-        self.right_layout.addWidget(clear_btn)
-
-        # Button bar: Next/Done/Complete -> prepares processing and navigates to Status tab
-        btn_bar = QHBoxLayout()
-        for key in ("MAP_NEXT", "MAP_DONE", "MAP_COMPLETE"):
-            b = QPushButton(String[key])
-            b.clicked.connect(self._on_ready_to_process)
-            btn_bar.addWidget(b)
-        self.right_layout.addLayout(btn_bar)
-
+        # Initial drop slot and stretch
         self._add_drop_slot(self.right_layout)
         self.right_layout.addStretch()
 
@@ -262,13 +268,7 @@ class MapScreen(QWidget):
         # Drop event handler will run and call _emit_mapping_changed
 
     def _on_header_drop(self, sender, text: str, index: Optional[int] = None, **kwargs):
-        # Ensure uniqueness: if this text exists in another slot, clear that one
-        if text:
-            for i, slot in enumerate(self.drop_slots):
-                if i == index:
-                    continue
-                if slot.text() == text:
-                    slot.clear()
+        # Allow headers to be used in multiple destinations; only dedupe within slot handled by DropSlot
         # If there are no empty slots, add one
         if not self._drop_slots_available():
             self.right_layout.takeAt(self.right_layout.count() - 1)
@@ -285,38 +285,77 @@ class MapScreen(QWidget):
             None,
         )
 
-    def _current_order(self) -> List[str]:
-        return [slot.text() for slot in self.drop_slots if slot.text()]
+    # New structured mapping helpers
+    def _current_mapping(self) -> List[Dict[str, Any]]:
+        mapping: List[Dict[str, Any]] = []
+        for slot in self.drop_slots:
+            if not slot.is_empty():
+                mapping.append({
+                    "sources": slot.get_sources(),
+                    "separator": slot.get_separator(),
+                })
+        return mapping
+
+    def _flatten_used_sources(self) -> List[str]:
+        seen = set()
+        flat: List[str] = []
+        for entry in self._current_mapping():
+            for s in entry.get("sources", []):
+                if s not in seen:
+                    seen.add(s)
+                    flat.append(s)
+        return flat
 
     def get_new_order(self):
-        return self._current_order()
+        # Backwards-compatible API: return flattened list of used sources
+        return self._flatten_used_sources()
 
     def _emit_mapping_changed(self):
-        EMIT("header.map.changed", order=self._current_order(), source=self.current_source_id)
+        EMIT("header.map.changed", order=self._flatten_used_sources(), source=self.current_source_id)
 
     def _persist_mapping(self):
         if not self.current_source_id:
             return
-        all_map = state.controls.get("map.order.by_source", {})
-        all_map = dict(all_map)  # shallow copy
-        all_map[self.current_source_id] = ",".join(self._current_order())
-        state.update_control("map.order.by_source", all_map)
+        # Save structured mapping
+        all_struct = state.controls.get("map.mapping.by_source", {})
+        all_struct = dict(all_struct)
+        all_struct[self.current_source_id] = self._current_mapping()
+        state.update_control("map.mapping.by_source", all_struct)
+        # Maintain legacy flattened string for old consumers
+        all_legacy = state.controls.get("map.order.by_source", {})
+        all_legacy = dict(all_legacy)
+        all_legacy[self.current_source_id] = ",".join(self._flatten_used_sources())
+        state.update_control("map.order.by_source", all_legacy)
 
-    def _apply_saved_order(self, saved: str):
+    def _apply_saved_order(self, saved):
         try:
-            items = [s.strip() for s in saved.split(",") if s.strip()]
+            # New format: list of dicts
+            if isinstance(saved, list):
+                # Make sure we have enough slots
+                needed = max(1, len(saved))
+                while len(self.drop_slots) < needed:
+                    self.right_layout.takeAt(self.right_layout.count() - 1)
+                    self._add_drop_slot(self.right_layout)
+                    self.right_layout.addStretch()
+                for i, entry in enumerate(saved):
+                    sources = list(entry.get("sources", [])) if isinstance(entry, dict) else []
+                    sep = entry.get("separator") if isinstance(entry, dict) else None
+                    if i < len(self.drop_slots):
+                        self.drop_slots[i].set_from(sources, sep)
+                return
+            # Legacy format: comma-separated string of single-source slots
+            if isinstance(saved, str):
+                items = [s.strip() for s in saved.split(",") if s.strip()]
+                needed = max(1, len(items))
+                while len(self.drop_slots) < needed:
+                    self.right_layout.takeAt(self.right_layout.count() - 1)
+                    self._add_drop_slot(self.right_layout)
+                    self.right_layout.addStretch()
+                for i, text in enumerate(items):
+                    if i < len(self.drop_slots):
+                        self.drop_slots[i].set_from([text], " ")
         except Exception:
             return
-        # Make sure we have enough slots
-        needed = max(1, len(items))
-        while len(self.drop_slots) < needed:
-            self.right_layout.takeAt(self.right_layout.count() - 1)
-            self._add_drop_slot(self.right_layout)
-            self.right_layout.addStretch()
-        # Fill slots
-        for i, text in enumerate(items):
-            if i < len(self.drop_slots):
-                self.drop_slots[i].set_text(text)
 
     def _clear_all_slots(self):
         for slot in self.drop_slots:
@@ -341,7 +380,7 @@ class MapScreen(QWidget):
 
     def _on_ready_to_process(self):
         """Validate mapping and skip rows, persist current processing context, and navigate to Status tab."""
-        order = self._current_order()
+        mapping = self._current_mapping()
         raw_skips = self.skip_rows_input.text().strip() if self.skip_rows_input else ""
         if raw_skips and not is_valid_skip_rows(raw_skips):
             EMIT("status.update", msg="Invalid skip rows expression.")
@@ -351,7 +390,7 @@ class MapScreen(QWidget):
         except Exception as e:
             EMIT("status.update", msg=f"Invalid skip rows: {e}")
             return
-        if not order:
+        if not mapping:
             EMIT("status.update", msg="No headers mapped; please add at least one.")
             return
         # Persist a structured processing context in state and notify
@@ -359,7 +398,9 @@ class MapScreen(QWidget):
             "processing.current",
             {
                 "source": self.current_source_id,
-                "order": order,
+                "mapping": mapping,
+                # Keep legacy field for simple UIs
+                "order": self._flatten_used_sources(),
                 "skip_rows": skip_rows,
             },
         )
