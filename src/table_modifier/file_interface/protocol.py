@@ -105,6 +105,15 @@ class FileInterfaceProtocol(Protocol):
         """
         ...
 
+    def set_rows_to_skip(self, rows: list[int]) -> None:
+        """
+        Set specific 0-based row indices to skip when loading data.
+        This maps directly to pandas' skiprows parameter for fine-grained control.
+        Implementations should prefer this over set_header_rows_to_skip when a non-contiguous
+        list is provided.
+        """
+        ...
+
     def save(self) -> None:
         """Write current DataFrame back to self.file_path."""
         ...

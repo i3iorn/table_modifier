@@ -35,12 +35,16 @@ class FileInterfaceFactory:
         raise ValueError(f"No handler for {file_path!r}")
 
 
+def _looks_like_interface(obj: object) -> bool:
+    return hasattr(obj, "path") and hasattr(obj, "append_list") and hasattr(obj, "save")
+
+
 def load(file_path: "FilePath") -> FileInterfaceProtocol:
     """
     Load or return a file interface for the given file path or interface.
     """
-    if isinstance(file_path, FileInterfaceProtocol):  # type: ignore[arg-type]
-        return file_path
+    if isinstance(file_path, FileInterfaceProtocol) or _looks_like_interface(file_path):  # type: ignore[arg-type]
+        return file_path  # type: ignore[return-value]
     return FileInterfaceFactory.create(str(file_path))
 
 

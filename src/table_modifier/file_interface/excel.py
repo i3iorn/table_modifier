@@ -20,6 +20,7 @@ class ExcelFileInterface(BaseInterface):
         self.sheet_name: Optional[str] = sheet_name
         self._df: Optional[pd.DataFrame] = None
         self._skip_rows: int = 0
+        self._skip_rows_list: Optional[List[int]] = None
 
     def get_headers(self, sheet_name: str = None) -> Optional[list[str]]:
         """
@@ -28,7 +29,7 @@ class ExcelFileInterface(BaseInterface):
         """
         self._ensure_sheet()
         sheet: int | str = sheet_name or self.sheet_name or 0
-        df = pd.read_excel(self.path, sheet_name=sheet, nrows=0, skiprows=self._skip_rows)
+        df = pd.read_excel(self.path, sheet_name=sheet, nrows=0, skiprows=self._skip_for_pandas())
         return list(df.columns)
 
     @classmethod
@@ -41,6 +42,9 @@ class ExcelFileInterface(BaseInterface):
         if self.sheet_name is None:
             xls = pd.ExcelFile(self.path)
             self.sheet_name = xls.sheet_names[0]
+
+    def _skip_for_pandas(self):
+        return self._skip_rows_list if self._skip_rows_list is not None else self._skip_rows
 
     def append_df(self, df: pd.DataFrame) -> None:
         # Ensure loaded DataFrame for the active sheet
@@ -60,7 +64,7 @@ class ExcelFileInterface(BaseInterface):
         # Eager read entire sheet
         self._ensure_sheet()
         sheet: int | str = self.sheet_name or 0
-        df = pd.read_excel(self.path, sheet_name=sheet, skiprows=self._skip_rows)
+        df = pd.read_excel(self.path, sheet_name=sheet, skiprows=self._skip_for_pandas())
         self._df = df
         return self._df
 
@@ -101,7 +105,7 @@ class ExcelFileInterface(BaseInterface):
         # Peek at first row if not already loaded
         if self._df is None:
             sheet: int | str = self.sheet_name or 0
-            df = pd.read_excel(self.path, sheet_name=sheet, skiprows=self._skip_rows, nrows=1)
+            df = pd.read_excel(self.path, sheet_name=sheet, skiprows=self._skip_for_pandas(), nrows=1)
         else:
             df = self._df
         return {str(col): str(dtype) for col, dtype in df.dtypes.items()}
@@ -126,6 +130,13 @@ class ExcelFileInterface(BaseInterface):
         """
         xls = pd.ExcelFile(self.path)
         return xls.sheet_names
+
+    def set_header_rows_to_skip(self, header_rows: int) -> None:
+        self._skip_rows = max(0, int(header_rows))
+        self._skip_rows_list = None
+
+    def set_rows_to_skip(self, rows: List[int]) -> None:
+        self._skip_rows_list = sorted(set(int(r) for r in rows if int(r) >= 0))
 
 
 FileInterfaceFactory.register(ExcelFileInterface)

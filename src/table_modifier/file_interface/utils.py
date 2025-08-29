@@ -3,7 +3,11 @@ from pathlib import Path
 from src.table_modifier.file_interface.factory import FileInterfaceFactory
 from src.table_modifier.file_interface.protocol import FileInterfaceProtocol
 
-FilePath = str | Path | FileInterfaceProtocol
+FilePath = str | Path | FileInterfaceProtocol | object
+
+
+def _looks_like_interface(obj: object) -> bool:
+    return hasattr(obj, "path") and hasattr(obj, "append_list") and hasattr(obj, "save")
 
 
 def from_file_path(file_path: FilePath) -> FileInterfaceProtocol:
@@ -16,8 +20,8 @@ def from_file_path(file_path: FilePath) -> FileInterfaceProtocol:
     Returns:
         FileInterfaceProtocol: The file interface instance.
     """
-    if isinstance(file_path, FileInterfaceProtocol):
-        return file_path
+    if isinstance(file_path, FileInterfaceProtocol) or _looks_like_interface(file_path):  # type: ignore[arg-type]
+        return file_path  # type: ignore[return-value]
     elif isinstance(file_path, str) or isinstance(file_path, Path):
         return FileInterfaceFactory.create(file_path)
     else:

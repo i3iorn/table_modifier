@@ -24,6 +24,7 @@ class CSVFileInterface(BaseInterface):
         self._file = None
         self._delimiter = kwargs.get("delimiter", ",")
         self._skip_rows: int = 0
+        self._skip_rows_list: Optional[List[int]] = None
 
     def get_headers(self, sheet_name: str = None) -> List[str] | None:
         """
@@ -62,10 +63,16 @@ class CSVFileInterface(BaseInterface):
             self._file = None
         return False  # Do not suppress exceptions
 
+    def _pandas_skiprows(self):
+        # Prefer explicit list of rows if provided
+        if self._skip_rows_list is not None:
+            return self._skip_rows_list
+        return self._skip_rows
+
     def load(self) -> DataFrame:
         logger.debug("Loading CSV from %s", self.path)
         try:
-            df = read_csv(self.path, skiprows=self._skip_rows)
+            df = read_csv(self.path, skiprows=self._pandas_skiprows())
         except Exception as e:
             logger.error("Failed to load CSV: %s", e)
             raise
@@ -73,7 +80,7 @@ class CSVFileInterface(BaseInterface):
         return df
 
     def iter_load(self, chunksize: int = 1_000) -> Iterator[DataFrame]:
-        return read_csv(self.path, skiprows=self._skip_rows, chunksize=chunksize)
+        return read_csv(self.path, skiprows=self._pandas_skiprows(), chunksize=chunksize)
 
     def iter_columns(
         self, value_count: Optional[int] = None, chunksize: int = 1_000
@@ -82,7 +89,7 @@ class CSVFileInterface(BaseInterface):
         Iterate over columns in the CSV file, yielding DataFrames with one column at a time.
         If value_count is specified, only yield that many values per column.
         """
-        for chunk in read_csv(self.path, skiprows=self._skip_rows, chunksize=chunksize):
+        for chunk in read_csv(self.path, skiprows=self._pandas_skiprows(), chunksize=chunksize):
             for col in chunk.columns:
                 col_series = chunk[col]
                 if value_count:
@@ -110,6 +117,10 @@ class CSVFileInterface(BaseInterface):
 
     def set_header_rows_to_skip(self, header_rows: int) -> None:
         self._skip_rows = max(0, int(header_rows))
+        self._skip_rows_list = None
+
+    def set_rows_to_skip(self, rows: List[int]) -> None:
+        self._skip_rows_list = sorted(set(int(r) for r in rows if int(r) >= 0))
 
     @property
     def encoding(self) -> str:
@@ -130,7 +141,7 @@ class CSVFileInterface(BaseInterface):
     def get_schema(self) -> Dict[str, str]:
         if self._df is None:
             # Peek at first row
-            df = read_csv(self.path, skiprows=self._skip_rows, nrows=1)
+            df = read_csv(self.path, skiprows=self._pandas_skiprows(), nrows=1)
         else:
             df = self._df
         return {str(col): str(dtype) for col, dtype in df.dtypes.items()}
