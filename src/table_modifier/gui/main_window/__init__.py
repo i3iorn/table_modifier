@@ -12,6 +12,7 @@ from src.table_modifier.gui.main_window.config_screen import ConfigScreen
 from src.table_modifier.gui.main_window.input_screen import InputScreen
 from src.table_modifier.gui.main_window.map_screen import MapScreen
 from src.table_modifier.gui.main_window.status_screen import StatusScreen
+from src.table_modifier.gui.theme_manager import ThemeManager
 from src.table_modifier.localization import String
 from src.table_modifier.signals import ON
 
@@ -39,6 +40,8 @@ class MainWindow(QMainWindow):
 
     def init_ui(self) -> None:
         """Initialize the central tab widget and menu bar."""
+        # Apply theme (default to dark). This applies to the whole application.
+        ThemeManager.apply("light")
         # Create a central widget with tabs
         tabs = QTabWidget(self)
         self.setCentralWidget(tabs)
@@ -54,6 +57,7 @@ class MainWindow(QMainWindow):
         ON("state.file.tracked_files.file.count", self.map_screen_enabled)
 
         self.init_menu_bar()
+
 
     def map_screen_enabled(self, sender: str, count: int, **kwargs: Any) -> None:
         """Enable the Map Columns tab when there are tracked files."""
