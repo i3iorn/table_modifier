@@ -1,4 +1,3 @@
-# table_modifier/checks/date_checks.py
 from datetime import datetime
 from typing import List, Union
 from .base import BaseCheck
