@@ -58,7 +58,7 @@ class ConfigScreen(QWidget):
 
         title_label = QLabel(String["CONFIG_SCREEN_TITLE"], self)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        title_label.setObjectName("screenTitle")
         assert self.layout() is not None
         self.layout().addWidget(title_label)
 

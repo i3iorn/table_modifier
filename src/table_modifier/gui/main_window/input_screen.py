@@ -23,7 +23,7 @@ class InputScreen(QWidget):
     def init_ui(self) -> None:
         title_label = QLabel(String["INPUT_SCREEN_TITLE"], self)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        title_label.setObjectName("screenTitle")
         self.main_layout.addWidget(title_label)
 
         self.init_folder_selector()

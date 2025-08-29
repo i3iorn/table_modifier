@@ -10,26 +10,22 @@ from src.table_modifier.signals import ON, EMIT
 class DraggableLabel(QLabel):
     """A label that can be dragged into a DropSlot to form a mapping.
 
-    Visual state:
-    - Default: neutral border
-    - While dragging: blue border
-    - Mapped (present in any drop slot): green border
+    Visual state is driven by QSS using dynamic properties:
+    - property 'dragging': true while being dragged
+    - property 'mapped': true when present in any drop slot (per 'order')
     """
 
     def __init__(self, text: str, parent: Optional[QFrame] = None):
         super().__init__(text, parent)
+        self.setObjectName("draggableLabel")
         self.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Raised)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setFixedSize(200, 40)
         self.setWordWrap(True)
-        # Keep a base style and append border tweaks so we don't lose background/etc on updates
-        self._base_style = (
-            "background: #f0f0f0;"
-            "border: 2px solid #ccc;"
-            "border-radius: 6px;"
-        )
-        self.is_dragging = False
-        self.update_style()
+        # initial properties
+        self.setProperty("dragging", False)
+        self.setProperty("mapped", False)
+        self._repolish()
         # Update visuals on drops, double-click inserts, and any mapping change
         ON("header.map.drop", self.update_style)
         ON("header.map.double_click", self.update_style)
@@ -37,8 +33,8 @@ class DraggableLabel(QLabel):
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.is_dragging = True
-            self.update_style()
+            self.setProperty("dragging", True)
+            self._repolish()
 
             drag = QDrag(self)
             mime_data = QMimeData()
@@ -51,32 +47,29 @@ class DraggableLabel(QLabel):
 
             drag.exec(Qt.DropAction.MoveAction)
 
-            self.is_dragging = False
-            self.update_style()
+            self.setProperty("dragging", False)
+            self._repolish()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         EMIT("header.map.double_click", text=self.text())
         event.accept()
 
     def update_style(self, sender=None, **kwargs):
-        """Update visual style according to mapping state and interaction.
-
-        Priority order:
-        1) If explicit order is provided (from 'header.map.changed'), mark green when in order
-        2) If a drop happened for this label's text, mark green
-        3) If currently dragging, mark blue
-        4) Default neutral
-        """
-        border_color = "#ccc"
+        """Update dynamic properties according to mapping state and interaction."""
+        mapped = False
         if "order" in kwargs:
             try:
-                if self.text() in (kwargs.get("order") or []):
-                    border_color = "green"
+                mapped = self.text() in (kwargs.get("order") or [])
             except Exception:
-                pass
+                mapped = False
         elif kwargs.get("text", None) == self.text():
-            border_color = "green"
-        elif self.is_dragging:
-            border_color = "#3399ff"
-        # apply combined style
-        self.setStyleSheet(f"{self._base_style} border: 2px solid {border_color}; border-radius: 6px;")
+            mapped = True
+        self.setProperty("mapped", bool(mapped))
+        self._repolish()
+
+    def _repolish(self) -> None:
+        # Re-apply style to reflect dynamic property changes
+        st = self.style()
+        st.unpolish(self)
+        st.polish(self)
+        self.update()
