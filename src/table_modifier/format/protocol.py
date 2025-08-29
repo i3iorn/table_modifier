@@ -123,3 +123,4 @@ class FormatProtocol(Protocol):
         ...         return {"encoding": "utf-8", "version": "1.0"}
         """
         raise NotImplementedError("FormatProtocol must implement the metadata method.")
+
