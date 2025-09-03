@@ -5,6 +5,8 @@ from typing import Literal, Optional
 
 from PyQt6.QtWidgets import QApplication, QWidget
 
+from src.table_modifier.config.state import state
+
 try:
     # Python 3.9+
     from importlib.resources import files as ir_files
@@ -62,6 +64,7 @@ class ThemeManager:
     @classmethod
     def apply(cls, theme: ThemeName = "dark", root: Optional[QWidget] = None) -> None:
         qss = cls.load_qss(theme)
+        state.update_control(f"theme.name", theme)
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(qss)
