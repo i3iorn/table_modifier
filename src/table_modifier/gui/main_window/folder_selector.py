@@ -25,6 +25,9 @@ class FolderSelectorWidget(QWidget):
         self.layout().setSpacing(0)
         
         self.init_ui()
+
+        # Emit default directory selection to initialize downstream widgets.
+        EMIT("directory.updated", directory=Path.home())
         
     def init_ui(self):
         self._debounce_folder_timer = QTimer(self)

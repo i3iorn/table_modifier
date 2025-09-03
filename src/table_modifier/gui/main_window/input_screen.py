@@ -5,7 +5,8 @@ from typing import Optional
 from platformdirs import user_downloads_dir
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QVBoxLayout, QSpacerItem, QSizePolicy, QWidget, QLabel
+from PyQt6.QtWidgets import QVBoxLayout, QSpacerItem, QSizePolicy, QWidget, QLabel, \
+    QLineEdit
 
 from src.table_modifier.gui.main_window.file_selector import FileSelectorWidget
 from src.table_modifier.gui.main_window.folder_selector import FolderSelectorWidget
@@ -30,7 +31,8 @@ class InputScreen(QWidget):
         self.init_file_selector()
 
         # Emit default directory selection to initialize downstream widgets.
-        EMIT("directory.updated", directory=user_downloads_dir())
+        # Default directory is user's Downloads folder.
+        EMIT("directory.updated", delay_ms=1000, directory=user_downloads_dir())
 
     def init_folder_selector(self) -> None:
         self.folder_selector = FolderSelectorWidget(self)
