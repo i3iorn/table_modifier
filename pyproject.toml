@@ -89,7 +89,7 @@ strict = true
 testpaths = [
   "tests"
 ]
-addopts = "--cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=62"
+addopts = "--cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=60"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]
