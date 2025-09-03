@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 
+from src.table_modifier.signals import ON
 from src.table_modifier.config import controls
 from src.table_modifier.config.state import state
 from src.table_modifier.localization import String
@@ -102,13 +103,13 @@ class ConfigScreen(QWidget):
     def _create_control(self, cfg: ControlConfig) -> QWidget:
         t = cfg.get("type")
         name = cfg.get("name")
+        default = cfg.get("default", None)
 
         if t == "combo":
             combo = QComboBox(self)
             items = list(cfg.get("items", []) or [])
             combo.addItems(items)
 
-            default = cfg.get("default")
             if isinstance(default, str) and default in items:
                 combo.setCurrentText(default)
             elif items:
@@ -118,12 +119,17 @@ class ConfigScreen(QWidget):
             return combo
 
         if t == "checkbox":
-            cb = QCheckBox(self)
-            cb.setChecked(bool(cfg.get("default", False)))
-            cb.stateChanged.connect(
-                lambda s, key=name: self._on_value_changed(key or "", Qt.CheckState(s) == Qt.CheckState.Checked)
-            )
-            return cb
+            label_text = String[str(default or False)]
+            checkbox = QCheckBox(label_text, self)
+            checkbox.setChecked(default or False)
+
+            def on_checkbox_state_changed(state, key=name, cb=checkbox):
+                checked = bool(state)
+                cb.setText(String[str(checked)])
+                self._on_value_changed(key or "", checked)
+
+            checkbox.stateChanged.connect(on_checkbox_state_changed)
+            return checkbox
 
         if t == "button":
             label_key = cfg.get("label", "")
