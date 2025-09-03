@@ -38,10 +38,9 @@ class CSVFileInterface(BaseInterface):
                     f.seek(0)
                     try:
                         dialect = csv.Sniffer().sniff(sample, delimiters=self._delimiter)
+                        reader = csv.reader(f, dialect)
                     except csv.Error:
-                        dialect = csv.get_dialect("excel")
-                        dialect.delimiter = self._delimiter
-                    reader = csv.reader(f, dialect)
+                        reader = csv.reader(f, delimiter=self._delimiter)
                     headers = next(reader, None)
                     self._cached_headers = headers
             except FileNotFoundError:
@@ -88,8 +87,9 @@ class CSVFileInterface(BaseInterface):
         """
         Iterate over columns in the CSV file, yielding DataFrames with one column at a time.
         If value_count is specified, only yield that many values per column.
+        Skips bad lines to avoid parser errors.
         """
-        for chunk in read_csv(self.path, skiprows=self._pandas_skiprows(), chunksize=chunksize):
+        for chunk in read_csv(self.path, skiprows=self._pandas_skiprows(), chunksize=chunksize, on_bad_lines='skip'):
             for col in chunk.columns:
                 col_series = chunk[col]
                 if value_count:
