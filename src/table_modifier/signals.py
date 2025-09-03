@@ -29,18 +29,40 @@ class EventBus:
                 self._signals[name] = Signal(name)
             return self._signals[name]
 
-    def emit(self, name: str, sender: Optional[Any] = None, **kwargs) -> None:
+    def emit(self, name: str, sender: Optional[Any] = None, delay_ms: Optional[int] = None, **kwargs) -> None:
         """
         Emit a namespaced signal, triggering all exact and wildcard matches.
 
         Args:
             name (str): Namespaced signal name, like "auth.user.login".
             sender (Any, optional): Sender object (defaults to inferred).
+            delay_ms (Optional[int]): If provided and > 0, schedule emit after this many milliseconds.
             **kwargs: Extra payload delivered to handlers.
         """
-        # Infer sender if not provided
+        # Infer sender if not provided, capture now to preserve caller context for delayed emits
         sender = sender or self._infer_sender()
 
+        if delay_ms is not None and delay_ms > 0:
+            self._logger.debug(
+                f"[EventBus] Scheduling delayed emit for '{name}' in {delay_ms}ms with kwargs: {kwargs}"
+            )
+
+            def _delayed_dispatch():
+                try:
+                    self._dispatch(name, sender, kwargs)
+                except Exception as e:
+                    self._logger.error(f"Error during delayed emit for '{name}': {e}", exc_info=True)
+
+            timer = threading.Timer(delay_ms / 1000.0, _delayed_dispatch)
+            timer.daemon = True
+            timer.start()
+            return
+
+        # Immediate dispatch
+        self._dispatch(name, sender, kwargs)
+
+    def _dispatch(self, name: str, sender: Optional[Any], kwargs: Dict[str, Any]) -> None:
+        """Internal: perform the actual dispatch of an already-prepared event."""
         # To avoid holding lock while dispatching handlers (which could deadlock),
         # first collect handlers while holding lock, then call outside.
         with self._lock:
@@ -161,7 +183,7 @@ class EventBus:
 _event_bus = EventBus()
 
 
-def EMIT(name: str, **kwargs) -> None:
+def EMIT(name: str, delay_ms: Optional[int] = None, **kwargs) -> None:
     """
     Emit a signal globally.
 
@@ -170,12 +192,13 @@ def EMIT(name: str, **kwargs) -> None:
 
     Args:
         name (str): The name of the signal to emit.
+        delay_ms (Optional[int]): If provided and > 0, schedule emit after this many milliseconds.
         **kwargs (**Any): Additional keyword arguments to pass with the signal.
 
     Returns:
         None
     """
-    _event_bus.emit(name, **kwargs)
+    _event_bus.emit(name, delay_ms=delay_ms, **kwargs)
 
 
 def ON(name: str, handler: Callable) -> Callable[[], None]:
