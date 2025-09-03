@@ -1,7 +1,7 @@
 from typing import List
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
+from PyQt6.QtCore import QMimeData, Qt
+from PyQt6.QtGui import QDrag, QDragEnterEvent, QDropEvent, QMouseEvent
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -35,17 +35,28 @@ class DropSlot(QWidget):
         layout.addWidget(self.display)
 
         # Separator editor row
-        sep_row = QHBoxLayout()
-        sep_label = QLabel("Sep:", self)
+        input_row = QHBoxLayout()
+
+        header_label = QLabel("Header:", self)
+        input_row.addWidget(header_label)
+        self.header_input = QLineEdit(self)
+        self.header_input.setPlaceholderText("Header name")
+        input_row.addWidget(self.header_input)
+
+        input_row.addStretch(1)
+
+        self.sep_label = QLabel("Sep:", self)
         self.sep_input = QLineEdit(self)
         self.sep_input.setPlaceholderText(self._default_sep)
         self.sep_input.setMaxLength(8)
         self.sep_input.setFixedWidth(80)
         self.sep_input.textChanged.connect(self._on_sep_changed)
-        sep_row.addWidget(sep_label)
-        sep_row.addWidget(self.sep_input)
-        sep_row.addStretch(1)
-        layout.addLayout(sep_row)
+        input_row.addWidget(self.sep_label)
+        input_row.addWidget(self.sep_input)
+        self.sep_input.hide()
+        self.sep_label.hide()
+        input_row.addStretch(1)
+        layout.addLayout(input_row)
 
         # initial property for QSS
         self.setProperty("filled", False)
@@ -53,15 +64,45 @@ class DropSlot(QWidget):
         self._repolish()
 
     # Drag-n-drop API
+    def mousePressEvent(self, event: QMouseEvent):
+        self._drag_start_pos = event.pos()
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setProperty("dragging", True)
+            self._repolish()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            if (event.pos() - self._drag_start_pos).manhattanLength() > 10:
+                drag = QDrag(self)
+                mime_data = QMimeData()
+                mime_data.setData("application/x-drop-slot-index", str(self.index).encode())
+                drag.setMimeData(mime_data)
+                drag.exec(Qt.DropAction.MoveAction)
+        super().mouseMoveEvent(event)
+
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasText():
+        md = event.mimeData()
+        if md.hasFormat("application/x-drop-slot-index") or md.hasFormat("application/x-header-text"):
             event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def dropEvent(self, event: QDropEvent):
-        text = event.mimeData().text().strip()
-        if text:
-            self.add_source(text)
-        event.acceptProposedAction()
+        md = event.mimeData()
+        if md.hasFormat("application/x-drop-slot-index"):
+            source_bytes = md.data("application/x-drop-slot-index")
+            source_index = int(bytes(source_bytes.data()).decode())
+            target_index = self.index
+            EMIT("drop_slot.reorder", source=source_index, target=target_index)
+            event.acceptProposedAction()
+        elif md.hasFormat("application/x-header-text"):
+            header_bytes = md.data("application/x-header-text")
+            header_text = bytes(header_bytes.data()).decode()
+            self.set_text(header_text)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     # Mouse interactions
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
@@ -136,6 +177,12 @@ class DropSlot(QWidget):
 
     def _update_filled(self) -> None:
         self.setProperty("filled", not self.is_empty())
+        if len(self.sources) > 1:
+            self.sep_input.show()
+            self.sep_label.show()
+        else:
+            self.sep_input.hide()
+            self.sep_label.hide()
         self._repolish()
 
     def _on_sep_changed(self, _text: str) -> None:
