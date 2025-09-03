@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
         ON("status.update", self.update_status_bar)
         ON("processing.current.updated", self._open_status_tab)
         self.setWindowTitle("Table Modifier")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 800, 800)
 
         # Keep a reference to the tab widget for clearer access later.
         self._tabs: QTabWidget
@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
         """Initialize the central tab widget and menu bar."""
         # Apply theme (default to dark). This applies to the whole application.
         ThemeManager.apply("light")
+        ON("theme.changed", ThemeManager.apply)
         # Create a central widget with tabs
         tabs = QTabWidget(self)
         self.setCentralWidget(tabs)
@@ -58,7 +59,6 @@ class MainWindow(QMainWindow):
 
         self.init_menu_bar()
 
-
     def map_screen_enabled(self, sender: str, count: int, **kwargs: Any) -> None:
         """Enable the Map Columns tab when there are tracked files."""
         self._tabs.setTabEnabled(2, count > 0)
@@ -72,6 +72,13 @@ class MainWindow(QMainWindow):
         """Initialize a non-native (cross-platform) menu bar."""
         self.menuBar().setNativeMenuBar(False)
         self.menu_bar = self.menuBar()
+        self.menu_bar.addAction(String["TOGGLE_DARK_MODE"], self.toggle_dark_mode)
+
+    def toggle_dark_mode(self) -> None:
+        if state.controls.get("theme.name") == "dark":
+            ThemeManager.apply("light")
+        else:
+            ThemeManager.apply("dark")
 
     def update_status_bar(self, sender: Any, msg: str, timeout: int = 8000, **kwargs: Any) -> None:
         """Update the status bar with a formatted message.
